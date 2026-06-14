@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Go — Scy Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ───────── Color Tokens ───────── */
+:root {
+  --bg: #09090b; /* zinc-950 */
+  --surface: #18181b; /* zinc-900 */
+  --surface-el: #27272a; /* zinc-800 */
+  --accent: #6366f1; /* indigo-500 */
+  --accent-hover: #818cf8; /* indigo-400 */
+  --text: #fafafa; /* zinc-50 */
+  --muted: #a1a1aa; /* zinc-400 */
+  --border: #27272a; /* zinc-800 */
+  --wood: #E5C396;
+  --grid: #5D4037;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
+}
+
+/* ───────── Reset & Base ───────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  height: 100%; overflow: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg); color: var(--text);
+}
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-el); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ───────── Top Nav ───────── */
+nav {
+  display: flex; align-items: center; gap: 24px;
+  background: var(--bg); padding: 0 32px; height: 64px;
+  border-bottom: 1px solid var(--border);
+}
+nav .logo {
+  font-weight: 600; font-size: 18px; color: var(--text);
+  margin-right: auto; letter-spacing: -0.025em;
+  display: flex; align-items: center; gap: 8px;
+}
+nav .logo span { color: var(--muted); font-weight: 400; }
+nav .nav-links { display: flex; gap: 6px; background: var(--surface); padding: 4px; border-radius: 8px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+nav button {
+  background: transparent; border: none; color: var(--muted);
+  padding: 6px 16px; border-radius: 6px; font-family: inherit;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all 0.2s ease;
+}
+nav button:hover { color: var(--text); }
+nav button.active {
+  background: var(--surface-el); color: var(--text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+/* ───────── Main Layout ───────── */
+.app {
+  display: grid; grid-template-columns: min-content 360px;
+  justify-content: center; align-items: start;
+  gap: 48px; padding: 40px 32px; max-width: 1200px; margin: 0 auto;
+  height: calc(100vh - 64px); overflow-y: auto;
+}
+.board-col { display: flex; flex-direction: column; gap: 24px; }
+.side-panel {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 16px;
+  padding: 24px; display: flex; flex-direction: column; gap: 20px;
+  box-shadow: var(--shadow-lg);
+}
+
+/* ───────── SVG Board ───────── */
+#board-svg { 
+  cursor: pointer; border-radius: 8px; display: block; 
+  box-shadow: var(--shadow-lg);
+}
+
+/* ───────── Status Bar ───────── */
+.status-bar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  font-size: 14px; font-weight: 500; color: var(--muted);
+}
+.status-bar .dot {
+  width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+  margin-right: 6px; vertical-align: -2px;
+}
+.status-bar .dot.black { background: #18181b; border: 2px solid #52525b; box-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+.status-bar .dot.white { background: #f4f4f5; border: 2px solid #e4e4e7; box-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+.status-bar .spacer { flex: 1; }
+.status-bar button {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); padding: 6px 16px; border-radius: 8px;
+  font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all 0.2s ease; box-shadow: var(--shadow-sm);
+}
+.status-bar button:hover:not(:disabled) { background: var(--surface-el); border-color: #3f3f46; }
+.status-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* thinking indicator */
+.thinking { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
+.thinking span {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+.thinking span:nth-child(2) { animation-delay: 0.2s; }
+.thinking span:nth-child(3) { animation-delay: 0.4s; }
+
+/* ───────── Side Panel Widgets ───────── */
+.panel-title {
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 4px; display: flex; align-items: center; gap: 8px;
+}
+.sim-group { display: flex; gap: 6px; background: var(--surface); padding: 4px; border-radius: 8px; border: 1px solid var(--border); }
+.sim-group button {
+  flex: 1; padding: 6px 0; border-radius: 6px;
+  border: none; background: transparent;
+  color: var(--muted); font-family: inherit; font-size: 13px;
+  font-weight: 500; cursor: pointer; transition: all 0.2s ease;
+}
+.sim-group button:hover { color: var(--text); }
+.sim-group button.active { background: var(--surface-el); color: var(--text); box-shadow: var(--shadow-sm); }
+
+.btn-primary {
+  width: 100%; padding: 12px; border-radius: 8px; border: none;
+  background: var(--accent); color: #fff; font-family: inherit;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+.btn-primary:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(1); }
+
+/* Move history */
+.move-list {
+  flex: 1; overflow-y: auto;
+  border-radius: 8px; padding-right: 4px;
+  max-height: 280px; font-size: 13px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.move-list .entry {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; border-radius: 6px; background: var(--surface);
+  border: 1px solid transparent; transition: border 0.2s ease;
+}
+.move-list .entry:hover { border-color: var(--border); }
+.move-list .entry .num { color: var(--muted); font-variant-numeric: tabular-nums; width: 32px; }
+.move-list .entry .coord { font-weight: 600; color: var(--text); }
+.move-list .entry .player-b { color: #d4d4d8; display: flex; align-items: center; gap: 6px; }
+.move-list .entry .player-w { color: #d4d4d8; display: flex; align-items: center; gap: 6px; }
+.move-list .entry .player-b::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #18181b; border: 1px solid #52525b; box-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+.move-list .entry .player-w::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #f4f4f5; border: 1px solid #a1a1aa; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+
+/* Score card */
+.score-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; text-align: center;
+}
+.score-card .label { color: var(--muted); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+.score-card .value { font-size: 24px; font-weight: 600; color: var(--text); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+/* ───────── Analysis Table ───────── */
+.results-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.results-table th {
+  text-align: left; padding: 8px 12px; color: var(--muted);
+  font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border);
+}
+.results-table td { padding: 10px 12px; border-bottom: 1px solid var(--surface); font-variant-numeric: tabular-nums; }
+.results-table tr:hover td { background: var(--surface); }
+.results-table tr:last-child td { border-bottom: none; }
+
+/* ───────── Visualizer Stats ───────── */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 4px;
+}
+.stat-card .label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.stat-card .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-card.best { grid-column: span 2; background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2); }
+.stat-card.best .value { color: var(--accent); display: flex; align-items: baseline; justify-content: space-between; }
+.stat-card.best .wr { font-size: 14px; font-weight: 500; color: var(--success); }
+
+/* bar chart */
+.bar-chart { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.bar-row { display: flex; align-items: center; gap: 12px; font-size: 12px; }
+.bar-row .bar-label { width: 28px; text-align: right; font-weight: 600; color: var(--text); }
+.bar-row .bar-track { flex: 1; height: 8px; background: var(--surface); border-radius: 4px; overflow: hidden; }
+.bar-row .bar-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.bar-row .bar-val { width: 44px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* progress bar */
+.progress-wrap { width: 100%; height: 4px; background: var(--surface); border-radius: 2px; overflow: hidden; margin-top: -8px; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.2s ease; }
+
+/* ───────── Toast Notifications ───────── */
+#toast-container { position: fixed; bottom: 32px; right: 32px; display: flex; flex-direction: column; gap: 12px; z-index: 1000; pointer-events: none; }
+.toast {
+  pointer-events: auto; padding: 14px 20px; border-radius: 8px; font-size: 14px; font-weight: 500;
+  display: flex; align-items: center; gap: 12px; min-width: 300px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  box-shadow: var(--shadow-lg);
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.toast::before { content: ""; width: 8px; height: 8px; border-radius: 50%; display: block; flex-shrink: 0; }
+.toast.success::before { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.toast.error::before { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+.toast.info::before { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.toast.dismiss { animation: slideOut 0.2s cubic-bezier(0.7, 0, 0.84, 0) forwards; }
+
+/* ───────── Keyframes ───────── */
+@keyframes pulse { 0%,100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
+@keyframes slideIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes slideOut { to { opacity: 0; transform: translateY(16px) scale(0.95); } }
+</style>
+</head>
+<body>
+
+<!-- ═══════ NAV ═══════ -->
+<nav>
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+    Scy Engine
+  </div>
+  <div class="nav-links">
+    <button class="active" onclick="switchMode('play')" id="nav-play">Play</button>
+    <button onclick="switchMode('analysis')" id="nav-analysis">Analysis</button>
+    <button onclick="switchMode('visualizer')" id="nav-visualizer">Visualizer</button>
+  </div>
+</nav>
+
+<!-- ═══════ APP ═══════ -->
+<div class="app">
+
+  <!-- Board Column -->
+  <div class="board-col">
+    <svg id="board-svg"></svg>
+    <div class="status-bar" id="status-bar"></div>
+  </div>
+
+  <!-- Side Panel -->
+  <div class="side-panel" id="side-panel"></div>
+
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+/* ================================================================
+   STATE
+   ================================================================ */
+const BOARD_SIZE = 9;
+const EMPTY = 0, BLACK = 1, WHITE = 2;
+const COL_LABELS = ['A','B','C','D','E','F','G','H','J']; // skip I
+
+let currentMode   = 'play';   // 'play' | 'analysis' | 'visualizer'
+let boardState     = [];       // 2D array [row][col], 0/1/2
+let isThinking     = false;
+let currentPlayer  = BLACK;
+let moveCount      = 0;
+let captures       = { 1:0, 2:0 };
+let moveHistory    = [];       // [{num, player, row, col, pass}]
+let lastMove       = null;     // {row, col} or null
+let analysisOverlay = [];      // [{row,col,win_rate,visits,ucb1,rank}]
+let simulations    = 1000;
+let visualizerSource = null;   // EventSource
+let gameOver       = false;
+
+// Board drawing constants
+const CELL   = 45;
+const PAD    = 36;  // padding for coordinate labels
+const STONE_R = 18;
+const STAR_R  = 4;
+const SVG_SIZE = PAD + CELL * (BOARD_SIZE - 1) + PAD;
+
+// Star (hoshi) points for 9×9 — 0-indexed
+const HOSHI = [[2,2],[2,6],[6,2],[6,6],[4,4]];
+
+/* ================================================================
+   INIT
+   ================================================================ */
+function initBoard() {
+  boardState = [];
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    boardState.push(new Array(BOARD_SIZE).fill(EMPTY));
+  }
+  currentPlayer = BLACK;
+  moveCount = 0;
+  captures = { 1:0, 2:0 };
+  moveHistory = [];
+  lastMove = null;
+  analysisOverlay = [];
+  gameOver = false;
+}
+
+initBoard();
+
+/* ================================================================
+   SVG BOARD RENDERING
+   ================================================================ */
+function boardX(col) { return PAD + col * CELL; }
+function boardY(row) { return PAD + row * CELL; }
+
+function buildSVG() {
+  const svg = document.getElementById('board-svg');
+  svg.setAttribute('width', SVG_SIZE);
+  svg.setAttribute('height', SVG_SIZE);
+  svg.setAttribute('viewBox', `0 0 ${SVG_SIZE} ${SVG_SIZE}`);
+  svg.innerHTML = '';
+
+  // — Defs: gradients —
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+
+  // Black stone gradient
+  const gBlack = radialGrad('grad-black', [
+    {offset:'0%',  color:'#555'},
+    {offset:'50%', color:'#333'},
+    {offset:'100%',color:'#111'}
+  ], 0.35, 0.35);
+  defs.appendChild(gBlack);
+
+  // White stone gradient
+  const gWhite = radialGrad('grad-white', [
+    {offset:'0%',  color:'#ffffff'},
+    {offset:'55%', color:'#f0f0f0'},
+    {offset:'100%',color:'#d0d0d0'}
+  ], 0.38, 0.32);
+  defs.appendChild(gWhite);
+
+  // Hover gradients
+  const gHoverB = radialGrad('grad-hover-black', [
+    {offset:'0%',  color:'rgba(80,80,80,0.45)'},
+    {offset:'100%',color:'rgba(17,17,17,0.35)'}
+  ], 0.35, 0.35);
+  defs.appendChild(gHoverB);
+
+  const gHoverW = radialGrad('grad-hover-white', [
+    {offset:'0%',  color:'rgba(255,255,255,0.45)'},
+    {offset:'100%',color:'rgba(208,208,208,0.35)'}
+  ], 0.38, 0.32);
+  defs.appendChild(gHoverW);
+
+  // Shadow filter
+  const filt = document.createElementNS('http://www.w3.org/2000/svg','filter');
+  filt.setAttribute('id','shadow');
+  filt.innerHTML = '<feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.4"/>';
+  defs.appendChild(filt);
+
+  // Board background gradient
+  const gBoard = radialGrad('grad-board', [
+    {offset:'0%', color:'#E5C396'},
+    {offset:'100%', color:'#CFA975'}
+  ], 0.5, 0.5);
+  defs.appendChild(gBoard);
+
+  svg.appendChild(defs);
+
+  // — Wood background —
+  const bg = svgEl('rect', {
+    x:0, y:0, width:SVG_SIZE, height:SVG_SIZE,
+    rx:10, fill:'url(#grad-board)'
+  });
+  svg.appendChild(bg);
+
+  // — Grid lines —
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    // vertical
+    svg.appendChild(svgEl('line', {
+      x1:boardX(i), y1:boardY(0),
+      x2:boardX(i), y2:boardY(BOARD_SIZE-1),
+      stroke:'#5D4037', 'stroke-width':1
+    }));
+    // horizontal
+    svg.appendChild(svgEl('line', {
+      x1:boardX(0), y1:boardY(i),
+      x2:boardX(BOARD_SIZE-1), y2:boardY(i),
+      stroke:'#5D4037', 'stroke-width':1
+    }));
+  }
+
+  // — Star points —
+  HOSHI.forEach(([r,c]) => {
+    svg.appendChild(svgEl('circle', {
+      cx:boardX(c), cy:boardY(r), r:STAR_R, fill:'#5D4037'
+    }));
+  });
+
+  // — Coordinate labels —
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    // Column labels (bottom)
+    svg.appendChild(svgText(boardX(i), SVG_SIZE - 10, COL_LABELS[i], 12, '#5D4037'));
+    // Row labels (left) — Go convention: row 1 at bottom
+    svg.appendChild(svgText(10, boardY(i) + 4, String(BOARD_SIZE - i), 12, '#5D4037'));
+  }
+
+  // — Click / Hover targets layer —
+  const interactionGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
+  interactionGroup.setAttribute('id','interact-layer');
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const rect = svgEl('rect', {
+        x: boardX(c) - CELL/2,
+        y: boardY(r) - CELL/2,
+        width: CELL, height: CELL,
+        fill: 'transparent', cursor: 'pointer',
+        'data-row': r, 'data-col': c
+      });
+      rect.addEventListener('click', () => handleBoardClick(r, c));
+      rect.addEventListener('mouseenter', () => showHover(r, c));
+      rect.addEventListener('mouseleave', clearHover);
+      interactionGroup.appendChild(rect);
+    }
+  }
+  svg.appendChild(interactionGroup);
+
+  // — Stones layer —
+  const stonesGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
+  stonesGroup.setAttribute('id','stones-layer');
+  svg.appendChild(stonesGroup);
+
+  // — Overlay layer (analysis / visualizer) —
+  const overlayGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
+  overlayGroup.setAttribute('id','overlay-layer');
+  svg.appendChild(overlayGroup);
+
+  // — Hover preview layer —
+  const hoverGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
+  hoverGroup.setAttribute('id','hover-layer');
+  hoverGroup.setAttribute('pointer-events','none');
+  svg.appendChild(hoverGroup);
+}
+
+function renderBoard() {
+  const layer = document.getElementById('stones-layer');
+  if (!layer) return;
+  layer.innerHTML = '';
+
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const s = boardState[r][c];
+      if (s === EMPTY) continue;
+      const cx = boardX(c), cy = boardY(r);
+      const gradId = s === BLACK ? 'grad-black' : 'grad-white';
+
+      // stone with drop shadow filter
+      layer.appendChild(svgEl('circle', {
+        cx, cy, r: STONE_R,
+        fill: `url(#${gradId})`,
+        stroke: s === BLACK ? '#18181b' : '#e4e4e7',
+        'stroke-width': 1,
+        filter: 'url(#shadow)'
+      }));
+    }
+  }
+
+  // Last-move indicator
+  if (lastMove) {
+    layer.appendChild(svgEl('circle', {
+      cx: boardX(lastMove.col),
+      cy: boardY(lastMove.row),
+      r: 5, fill: '#ef4444'
+    }));
+  }
+
+  renderAnalysisOverlayOnSVG();
+}
+
+function renderAnalysisOverlayOnSVG() {
+  const layer = document.getElementById('overlay-layer');
+  if (!layer) return;
+  layer.innerHTML = '';
+  if (analysisOverlay.length === 0) return;
+
+  analysisOverlay.forEach((m, i) => {
+    const cx = boardX(m.col), cy = boardY(m.row);
+    const color = i === 0 ? 'rgba(34,197,94,0.45)' : 'rgba(14,165,233,0.35)';
+    layer.appendChild(svgEl('circle', {
+      cx, cy, r: STONE_R, fill: color
+    }));
+    // Win rate text
+    const wr = (m.win_rate * 100).toFixed(0) + '%';
+    const txt = svgText(cx, cy + 4, wr, 11, '#fff');
+    txt.setAttribute('font-weight', '700');
+    txt.setAttribute('text-anchor', 'middle');
+    txt.setAttribute('pointer-events', 'none');
+    layer.appendChild(txt);
+  });
+}
+
+/* Hover preview */
+function showHover(r, c) {
+  if (isThinking || gameOver) return;
+  if (boardState[r][c] !== EMPTY) return;
+  // In analysis mode, always show a black stone preview for placement
+  if (currentMode === 'play' && currentPlayer !== BLACK) return;
+
+  const layer = document.getElementById('hover-layer');
+  layer.innerHTML = '';
+
+  let gradId;
+  if (currentMode === 'analysis') {
+    gradId = 'grad-hover-black'; // analysis places stones freely
+  } else {
+    gradId = currentPlayer === BLACK ? 'grad-hover-black' : 'grad-hover-white';
+  }
+  layer.appendChild(svgEl('circle', {
+    cx: boardX(c), cy: boardY(r), r: STONE_R,
+    fill: `url(#${gradId})`
+  }));
+}
+
+function clearHover() {
+  const layer = document.getElementById('hover-layer');
+  if (layer) layer.innerHTML = '';
+}
+
+/* SVG helpers */
+function svgEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+function svgText(x, y, content, size, fill) {
+  const t = svgEl('text', {
+    x, y, fill, 'font-size': size,
+    'font-family': 'Inter,sans-serif',
+    'text-anchor': 'middle',
+    'dominant-baseline': 'central'
+  });
+  t.textContent = content;
+  return t;
+}
+function radialGrad(id, stops, fx, fy) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg','radialGradient');
+  g.setAttribute('id', id);
+  g.setAttribute('cx','50%'); g.setAttribute('cy','50%');
+  g.setAttribute('fx', (fx*100)+'%'); g.setAttribute('fy', (fy*100)+'%');
+  g.setAttribute('r','50%');
+  stops.forEach(s => {
+    const st = document.createElementNS('http://www.w3.org/2000/svg','stop');
+    st.setAttribute('offset', s.offset);
+    st.setAttribute('stop-color', s.color);
+    g.appendChild(st);
+  });
+  return g;
+}
+
+/* ================================================================
+   FORMAT HELPERS
+   ================================================================ */
+function formatCoord(row, col) {
+  if (row < 0 || col < 0) return 'Pass';
+  return COL_LABELS[col] + (BOARD_SIZE - row);
+}
+
+function playerName(p) { return p === BLACK ? 'Black' : 'White'; }
+
+/* ================================================================
+   STATUS BAR
+   ================================================================ */
+function renderStatusBar() {
+  const sb = document.getElementById('status-bar');
+  const dotCls = currentPlayer === BLACK ? 'black' : 'white';
+  const thinkHTML = isThinking
+    ? `<div class="thinking"><span></span><span></span><span></span></div>`
+    : '';
+
+  sb.innerHTML = `
+    <span><span class="dot ${dotCls}"></span>${playerName(currentPlayer)}'s turn</span>
+    <span style="color:var(--muted)">Move ${moveCount}</span>
+    <span style="color:var(--muted)">B: ${captures[BLACK]}  W: ${captures[WHITE]}</span>
+    ${isThinking ? `<span style="color:var(--accent)">Engine Thinking${thinkHTML}</span>` : ''}
+    <span class="spacer"></span>
+    <button onclick="passMove()" ${isThinking || gameOver ? 'disabled' : ''}>Pass</button>
+    <button onclick="newGame()">New Game</button>
+  `;
+}
+
+/* ================================================================
+   SIDE PANEL RENDERING
+   ================================================================ */
+function renderSidePanel() {
+  const panel = document.getElementById('side-panel');
+  if (currentMode === 'play')        panel.innerHTML = renderPlayPanel();
+  else if (currentMode === 'analysis') panel.innerHTML = renderAnalysisPanel();
+  else                                 panel.innerHTML = renderVisualizerPanel();
+}
+
+function simButtons() {
+  return [500,1000,3000,5000].map(n =>
+    `<button class="${n===simulations?'active':''}" onclick="setSimulations(${n})">${n.toLocaleString()}</button>`
+  ).join('');
+}
+
+/* ──── Play Panel ──── */
+function renderPlayPanel() {
+  let histHTML = '';
+  moveHistory.forEach(m => {
+    const cls = m.player === BLACK ? 'player-b' : 'player-w';
+    const coord = m.pass ? 'Pass' : formatCoord(m.row, m.col);
+    histHTML += `<div class="entry"><span class="num">#${m.num}</span><span class="coord ${cls}">${playerName(m.player)}: ${coord}</span></div>`;
+  });
+
+  return `
+    <div class="panel-title">Human vs AI</div>
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">MCTS Simulations</div>
+      <div class="sim-group">${simButtons()}</div>
+    </div>
+    <div class="panel-title" style="margin-top:4px;">Move History</div>
+    <div class="move-list" id="move-list">${histHTML || '<div style="color:var(--muted);text-align:center;padding:16px;">No moves yet</div>'}</div>
+    <div class="score-card">
+      <div class="label">Score Estimate</div>
+      <div class="value" id="score-display">—</div>
+    </div>
+  `;
+}
+
+/* ──── Analysis Panel ──── */
+function renderAnalysisPanel() {
+  let tableRows = '';
+  analysisOverlay.forEach((m, i) => {
+    tableRows += `<tr>
+      <td>${i+1}</td>
+      <td style="font-weight:600">${formatCoord(m.row, m.col)}</td>
+      <td>${m.visits}</td>
+      <td style="color:${m.win_rate >= 0.5 ? 'var(--success)' : 'var(--danger)'}">${(m.win_rate*100).toFixed(1)}%</td>
+      <td>${m.ucb1 != null ? m.ucb1.toFixed(3) : '—'}</td>
+    </tr>`;
+  });
+
+  return `
+    <div class="panel-title">Position Analysis</div>
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Simulations</div>
+      <div class="sim-group">${simButtons()}</div>
+    </div>
+    <button class="btn-primary" onclick="analysePosition()" ${isThinking?'disabled':''}>
+      ${isThinking ? 'Analysing…' : 'Analyse Position'}
+    </button>
+    <div style="font-size:11px;color:var(--muted);">Click board to place / remove stones freely.</div>
+    ${tableRows ? `
+    <div class="panel-title" style="margin-top:4px;">Results</div>
+    <table class="results-table">
+      <thead><tr><th>#</th><th>Move</th><th>Visits</th><th>Win%</th><th>UCB1</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>` : ''}
+  `;
+}
+
+/* ──── Visualizer Panel ──── */
+function renderVisualizerPanel() {
+  return `
+    <div class="panel-title">Algorithm Visualizer</div>
+    <div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Simulations</div>
+      <div class="sim-group">${simButtons()}</div>
+    </div>
+    <button class="btn-primary" id="btn-viz" onclick="runVisualizer()" ${isThinking?'disabled':''}>
+      ${isThinking ? 'Running…' : 'Run Visualizer'}
+    </button>
+    <div class="progress-wrap"><div class="progress-bar" id="viz-progress" style="width:0%"></div></div>
+    <div class="stat-big" id="viz-total">
+      <div class="label">Total Simulations</div>
+      <div class="value">0</div>
+    </div>
+    <div class="best-card" id="viz-best" style="display:none;">
+      <div class="label" style="font-size:10px;color:var(--muted);">Current Best Move</div>
+      <div class="move">—</div>
+      <div class="wr">—</div>
+    </div>
+    <div class="panel-title" style="margin-top:2px;">Top Nodes</div>
+    <table class="results-table" id="viz-table">
+      <thead><tr><th>Move</th><th>Visits</th><th>Win%</th><th>UCB1</th></tr></thead>
+      <tbody id="viz-tbody"></tbody>
+    </table>
+    <div class="panel-title" style="margin-top:2px;">Visit Distribution</div>
+    <div class="bar-chart" id="viz-bars"></div>
+  `;
+}
+
+/* ================================================================
+   MODE SWITCHING
+   ================================================================ */
+function switchMode(mode) {
+  if (mode === currentMode) return;
+  // stop any running visualizer
+  if (visualizerSource) { visualizerSource.close(); visualizerSource = null; }
+  isThinking = false;
+  currentMode = mode;
+  analysisOverlay = [];
+
+  // If switching to analysis or visualizer, keep board state; if switching to play, reset
+  if (mode === 'play') {
+    initBoard();
+  }
+
+  // Update nav buttons
+  document.querySelectorAll('.nav-links button').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('nav-' + mode)?.classList.add('active');
+
+  updateUI();
+}
+
+/* ================================================================
+   UI REFRESH
+   ================================================================ */
+function updateUI() {
+  renderBoard();
+  renderStatusBar();
+  renderSidePanel();
+}
+
+function setSimulations(n) {
+  simulations = n;
+  renderSidePanel(); // re-render to update active button
+}
+
+/* ================================================================
+   BOARD CLICK HANDLER
+   ================================================================ */
+function handleBoardClick(row, col) {
+  if (isThinking) return;
+  if (currentMode === 'play')        return makeMove(row, col);
+  if (currentMode === 'analysis')    return toggleStone(row, col);
+  // visualizer: no board clicks needed during run
+}
+
+/* ──── Analysis: toggle stone ──── */
+function toggleStone(row, col) {
+  if (boardState[row][col] === EMPTY) {
+    boardState[row][col] = BLACK;
+  } else if (boardState[row][col] === BLACK) {
+    boardState[row][col] = WHITE;
+  } else {
+    boardState[row][col] = EMPTY;
+  }
+  analysisOverlay = [];
+  updateUI();
+}
+
+/* ================================================================
+   API: MAKE MOVE  (Play mode)
+   ================================================================ */
+async function makeMove(row, col) {
+  if (gameOver) return;
+  if (currentPlayer !== BLACK) return; // player is always BLACK
+  if (boardState[row][col] !== EMPTY) {
+    showToast('Intersection is occupied', 'error');
+    return;
+  }
+
+  isThinking = true;
+  updateUI();
+
+  try {
+    const res = await fetch('/api/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ row, col, simulations })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast(data.error || 'Illegal move', 'error');
+      isThinking = false;
+      updateUI();
+      return;
+    }
+    applyMoveResponse(data, row, col);
+  } catch (e) {
+    showToast('Network error: ' + e.message, 'error');
+  }
+  isThinking = false;
+  updateUI();
+}
+
+function applyMoveResponse(data, playerRow, playerCol) {
+  // Update board from server
+  if (data.board_state) boardState = data.board_state;
+  if (data.captures) captures = data.captures;
+  if (data.move_count != null) moveCount = data.move_count;
+  if (data.current_player != null) currentPlayer = data.current_player;
+  if (data.game_over) gameOver = true;
+  if (data.score) {
+    setTimeout(() => {
+      const el = document.getElementById('score-display');
+      if (el) el.textContent = `B: ${data.score.black} — W: ${data.score.white}`;
+    }, 50);
+  }
+
+  // Record player move
+  moveHistory.push({
+    num: moveHistory.length + 1,
+    player: BLACK,
+    row: playerRow,
+    col: playerCol,
+    pass: false
+  });
+
+  // Record AI move (backend sends engine_move as [r,c] array or "pass")
+  if (data.engine_move != null) {
+    if (data.engine_move === 'pass') {
+      moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row:-1, col:-1, pass:true });
+      lastMove = null;
+    } else {
+      const em = data.engine_move;
+      moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row:em[0], col:em[1], pass:false });
+      lastMove = { row:em[0], col:em[1] };
+    }
+  } else {
+    lastMove = { row:playerRow, col:playerCol };
+  }
+
+  if (data.game_over) {
+    showToast('Game Over! ' + (data.winner || ''), 'info');
+  }
+}
+
+/* ================================================================
+   API: PASS
+   ================================================================ */
+async function passMove() {
+  if (isThinking || gameOver) return;
+  isThinking = true;
+  updateUI();
+
+  try {
+    const res = await fetch('/api/pass', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ simulations })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast(data.error || 'Pass failed', 'error');
+      isThinking = false;
+      updateUI();
+      return;
+    }
+
+    moveHistory.push({ num: moveHistory.length + 1, player: BLACK, row:-1, col:-1, pass:true });
+
+    if (data.board_state) boardState = data.board_state;
+    if (data.captures) captures = data.captures;
+    if (data.move_count != null) moveCount = data.move_count;
+    if (data.current_player != null) currentPlayer = data.current_player;
+
+    if (data.engine_move != null) {
+      if (data.engine_move === 'pass') {
+        moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row:-1, col:-1, pass:true });
+        lastMove = null;
+      } else {
+        const em = data.engine_move;
+        moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row:em[0], col:em[1], pass:false });
+        lastMove = { row:em[0], col:em[1] };
+      }
+    }
+
+    if (data.game_over) {
+      gameOver = true;
+      showToast('Game Over! ' + (data.winner || ''), 'info');
+    }
+  } catch (e) {
+    showToast('Network error: ' + e.message, 'error');
+  }
+
+  isThinking = false;
+  updateUI();
+}
+
+/* ================================================================
+   API: NEW GAME
+   ================================================================ */
+async function newGame() {
+  if (visualizerSource) { visualizerSource.close(); visualizerSource = null; }
+  isThinking = false;
+
+  try {
+    const res = await fetch('/api/new_game', { method: 'POST' });
+    const data = await res.json();
+    if (data.board_state) {
+      initBoard();
+      boardState = data.board_state;
+      if (data.current_player != null) currentPlayer = data.current_player;
+      moveCount = data.move_count || 0;
+      captures = data.captures || {black:0, white:0};
+      gameOver = false;
+      moveHistory = [];
+      lastMove = null;
+      showToast('New game started', 'success');
+    } else {
+      initBoard();
+      showToast('New game started', 'success');
+    }
+  } catch (e) {
+    initBoard();
+    showToast('New game (offline)', 'info');
+  }
+  updateUI();
+}
+
+/* ================================================================
+   API: ANALYSE POSITION
+   ================================================================ */
+async function analysePosition() {
+  isThinking = true;
+  analysisOverlay = [];
+  updateUI();
+
+  try {
+    const res = await fetch('/api/analyse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ board_state: boardState, simulations })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast(data.error || 'Analysis failed', 'error');
+      isThinking = false;
+      updateUI();
+      return;
+    }
+    if (data.candidates && data.candidates.length) {
+      analysisOverlay = data.candidates.slice(0, 5).map((c, i) => ({
+        row: c.move[0],
+        col: c.move[1],
+        win_rate: c.win_rate,
+        visits: c.visits,
+        ucb1: c.ucb1,
+        rank: i + 1
+      }));
+    }
+    showToast('Analysis complete', 'success');
+  } catch (e) {
+    showToast('Network error: ' + e.message, 'error');
+  }
+
+  isThinking = false;
+  updateUI();
+}
+
+/* ================================================================
+   API: VISUALIZER  (SSE)
+   ================================================================ */
+function runVisualizer() {
+  if (isThinking) return;
+  if (visualizerSource) { visualizerSource.close(); visualizerSource = null; }
+  isThinking = true;
+  analysisOverlay = [];
+  updateUI();
+
+  const url = `/api/visualize?simulations=${simulations}&board_state=${encodeURIComponent(JSON.stringify(boardState))}`;
+  visualizerSource = new EventSource(url);
+
+  visualizerSource.onmessage = function(event) {
+    try {
+      const data = JSON.parse(event.data);
+      updateVisualizerStats(data);
+    } catch (e) { /* ignore parse errors */ }
+  };
+
+  visualizerSource.addEventListener('done', function(event) {
+    try {
+      const data = JSON.parse(event.data);
+      updateVisualizerStats(data);
+      // Highlight best move on board
+      if (data.top_moves && data.top_moves.length > 0) {
+        const best = data.top_moves[0];
+        analysisOverlay = [{ row:best.move[0], col:best.move[1], win_rate:best.win_rate, visits:best.visits, ucb1:best.ucb1, rank:1 }];
+        renderBoard();
+      }
+    } catch (e) { /* */ }
+    visualizerSource.close();
+    visualizerSource = null;
+    isThinking = false;
+    showToast('Visualization complete', 'success');
+    renderStatusBar();
+    const btn = document.getElementById('btn-viz');
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Visualizer'; }
+  });
+
+  visualizerSource.onerror = function() {
+    visualizerSource.close();
+    visualizerSource = null;
+    isThinking = false;
+    showToast('Visualizer connection lost', 'error');
+    updateUI();
+  };
+}
+
+function updateVisualizerStats(data) {
+  // Total simulations
+  const totalEl = document.getElementById('viz-total');
+  if (totalEl && data.total_simulations != null) {
+    totalEl.querySelector('.value').textContent = data.total_simulations.toLocaleString();
+  }
+
+  // Progress
+  const progEl = document.getElementById('viz-progress');
+  if (progEl && data.total_simulations != null) {
+    const pct = Math.min(100, (data.total_simulations / simulations) * 100);
+    progEl.style.width = pct + '%';
+  }
+
+  // Best move card
+  const bestEl = document.getElementById('viz-best');
+  if (bestEl && data.top_moves && data.top_moves.length > 0) {
+    bestEl.style.display = 'block';
+    const b = data.top_moves[0];
+    bestEl.querySelector('.move').textContent = formatCoord(b.move[0], b.move[1]);
+    bestEl.querySelector('.wr').textContent = (b.win_rate * 100).toFixed(1) + '% win rate';
+  }
+
+  // Top nodes table
+  const tbody = document.getElementById('viz-tbody');
+  if (tbody && data.top_moves) {
+    tbody.innerHTML = data.top_moves.slice(0,5).map(n => `
+      <tr>
+        <td style="font-weight:600">${formatCoord(n.move[0], n.move[1])}</td>
+        <td>${n.visits}</td>
+        <td style="color:${n.win_rate >= 0.5 ? 'var(--success)' : 'var(--danger)'}">${(n.win_rate*100).toFixed(1)}%</td>
+        <td>${n.ucb1 != null ? n.ucb1.toFixed(3) : '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  // Bar chart
+  const bars = document.getElementById('viz-bars');
+  if (bars && data.top_moves) {
+    const maxV = Math.max(...data.top_moves.slice(0,5).map(n => n.visits), 1);
+    bars.innerHTML = data.top_moves.slice(0,5).map(n => {
+      const pct = (n.visits / maxV) * 100;
+      return `<div class="bar-row">
+        <span class="bar-label">${formatCoord(n.move[0], n.move[1])}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <span class="bar-val">${n.visits}</span>
+      </div>`;
+    }).join('');
+  }
+}
+
+/* ================================================================
+   TOAST NOTIFICATIONS
+   ================================================================ */
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('dismiss');
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+/* ================================================================
+   BOOT
+   ================================================================ */
+buildSVG();
+updateUI();
+
+// Try to start a new game on the server
+fetch('/api/new_game', { method: 'POST' })
+  .then(r => r.json())
+  .then(data => {
+    if (data.board_state) {
+      boardState = data.board_state;
+      if (data.current_player != null) currentPlayer = data.current_player;
+      updateUI();
+    }
+  })
+  .catch(() => { /* offline / server not running yet — that's fine */ });
+</script>
+</body>
+</html>
