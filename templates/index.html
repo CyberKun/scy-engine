@@ -3,1088 +3,840 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Go — Scy Engine</title>
+<title>Scy · MCTS Go Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* ───────── Color Tokens ───────── */
+/* ═══════════════════════════════════════════
+   TOKENS
+   ═══════════════════════════════════════════ */
 :root {
-  --bg: #09090b; /* zinc-950 */
-  --surface: #18181b; /* zinc-900 */
-  --surface-el: #27272a; /* zinc-800 */
-  --accent: #6366f1; /* indigo-500 */
-  --accent-hover: #818cf8; /* indigo-400 */
-  --text: #fafafa; /* zinc-50 */
-  --muted: #a1a1aa; /* zinc-400 */
-  --border: #27272a; /* zinc-800 */
-  --wood: #E5C396;
-  --grid: #5D4037;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
+  --bg:      #222831;
+  --panel:   #2C3440;
+  --surface: #353F4D;
+  --goban:   #D4A843;
+  --warm:    #CF5C36;
+  --cool:    #3F88A8;
+  --text:    #C9D1D9;
+  --muted:   #7D8590;
+  --dim:     #4D5666;
+  --border:  #3A4250;
+  --mono:    'JetBrains Mono', monospace;
+  --sans:    'DM Sans', sans-serif;
 }
 
-/* ───────── Reset & Base ───────── */
+/* ═══════════════════════════════════════════
+   RESET
+   ═══════════════════════════════════════════ */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
   height: 100%; overflow: hidden;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--sans); background: var(--bg); color: var(--text);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background: var(--bg); color: var(--text);
 }
-::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--surface-el); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+::-webkit-scrollbar-thumb { background: var(--dim); }
 
-/* ───────── Top Nav ───────── */
-nav {
-  display: flex; align-items: center; gap: 24px;
-  background: var(--bg); padding: 0 32px; height: 64px;
-  border-bottom: 1px solid var(--border);
-}
-nav .logo {
-  font-weight: 600; font-size: 18px; color: var(--text);
-  margin-right: auto; letter-spacing: -0.025em;
-  display: flex; align-items: center; gap: 8px;
-}
-nav .logo span { color: var(--muted); font-weight: 400; }
-nav .nav-links { display: flex; gap: 6px; background: var(--surface); padding: 4px; border-radius: 8px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
-nav button {
-  background: transparent; border: none; color: var(--muted);
-  padding: 6px 16px; border-radius: 6px; font-family: inherit;
-  font-size: 13px; font-weight: 500; cursor: pointer;
-  transition: all 0.2s ease;
-}
-nav button:hover { color: var(--text); }
-nav button.active {
-  background: var(--surface-el); color: var(--text);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+/* ═══════════════════════════════════════════
+   LAYOUT
+   ═══════════════════════════════════════════ */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+header {
+  display: flex; align-items: center; height: 42px;
+  padding: 0 16px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; gap: 12px;
 }
 
-/* ───────── Main Layout ───────── */
-.app {
-  display: grid; grid-template-columns: min-content 360px;
-  justify-content: center; align-items: start;
-  gap: 48px; padding: 40px 32px; max-width: 1200px; margin: 0 auto;
-  height: calc(100vh - 64px); overflow-y: auto;
-}
-.board-col { display: flex; flex-direction: column; gap: 24px; }
-.side-panel {
-  background: var(--bg); border: 1px solid var(--border); border-radius: 16px;
-  padding: 24px; display: flex; flex-direction: column; gap: 20px;
-  box-shadow: var(--shadow-lg);
+main { display: flex; flex: 1; overflow: hidden; }
+
+#board-area {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 8px; min-width: 0;
 }
 
-/* ───────── SVG Board ───────── */
-#board-svg { 
-  cursor: pointer; border-radius: 8px; display: block; 
-  box-shadow: var(--shadow-lg);
+aside {
+  width: 300px; border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+  background: var(--panel);
 }
 
-/* ───────── Status Bar ───────── */
-.status-bar {
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  font-size: 14px; font-weight: 500; color: var(--muted);
-}
-.status-bar .dot {
-  width: 12px; height: 12px; border-radius: 50%; display: inline-block;
-  margin-right: 6px; vertical-align: -2px;
-}
-.status-bar .dot.black { background: #18181b; border: 2px solid #52525b; box-shadow: 0 1px 2px rgba(0,0,0,0.8); }
-.status-bar .dot.white { background: #f4f4f5; border: 2px solid #e4e4e7; box-shadow: 0 1px 2px rgba(0,0,0,0.8); }
-.status-bar .spacer { flex: 1; }
-.status-bar button {
-  background: var(--surface); border: 1px solid var(--border);
-  color: var(--text); padding: 6px 16px; border-radius: 8px;
-  font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
-  transition: all 0.2s ease; box-shadow: var(--shadow-sm);
-}
-.status-bar button:hover:not(:disabled) { background: var(--surface-el); border-color: #3f3f46; }
-.status-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+#panel { flex: 1; overflow-y: auto; padding: 14px 16px; }
 
-/* thinking indicator */
-.thinking { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
-.thinking span {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
-  animation: pulse 1s ease-in-out infinite;
+#status {
+  padding: 8px 16px; font-family: var(--mono); font-size: 11px;
+  color: var(--muted); border-top: 1px solid var(--border); flex-shrink: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.thinking span:nth-child(2) { animation-delay: 0.2s; }
-.thinking span:nth-child(3) { animation-delay: 0.4s; }
 
-/* ───────── Side Panel Widgets ───────── */
-.panel-title {
-  font-size: 12px; font-weight: 600; color: var(--muted);
-  text-transform: uppercase; letter-spacing: 0.05em;
-  margin-bottom: 4px; display: flex; align-items: center; gap: 8px;
+/* ═══════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════ */
+.brand { font-family: var(--mono); font-size: 14px; font-weight: 600; letter-spacing: 0.04em; }
+header nav { display: flex; margin-left: auto; height: 100%; }
+
+.mtab {
+  font-family: var(--sans); font-size: 13px; font-weight: 500;
+  color: var(--muted); background: none; border: none;
+  padding: 0 12px; cursor: pointer;
+  border-bottom: 2px solid transparent; transition: color 0.12s;
 }
-.sim-group { display: flex; gap: 6px; background: var(--surface); padding: 4px; border-radius: 8px; border: 1px solid var(--border); }
-.sim-group button {
-  flex: 1; padding: 6px 0; border-radius: 6px;
-  border: none; background: transparent;
-  color: var(--muted); font-family: inherit; font-size: 13px;
-  font-weight: 500; cursor: pointer; transition: all 0.2s ease;
+.mtab:hover { color: var(--text); }
+.mtab.on    { color: var(--text); border-bottom-color: var(--text); }
+
+/* ═══════════════════════════════════════════
+   BOARD SVG
+   ═══════════════════════════════════════════ */
+#goban { display: block; user-select: none; -webkit-user-select: none; }
+
+/* ═══════════════════════════════════════════
+   SIDEBAR WIDGETS
+   ═══════════════════════════════════════════ */
+.sec {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--dim); padding: 14px 0 6px;
 }
-.sim-group button:hover { color: var(--text); }
-.sim-group button.active { background: var(--surface-el); color: var(--text); box-shadow: var(--shadow-sm); }
+.sec:first-child { padding-top: 2px; }
 
-.btn-primary {
-  width: 100%; padding: 12px; border-radius: 8px; border: none;
-  background: var(--accent); color: #fff; font-family: inherit;
-  font-size: 14px; font-weight: 600; cursor: pointer;
-  transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+.dr {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 13px; padding: 2px 0;
 }
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-.btn-primary:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(1); }
+.dr .l { color: var(--muted); }
 
-/* Move history */
-.move-list {
-  flex: 1; overflow-y: auto;
-  border-radius: 8px; padding-right: 4px;
-  max-height: 280px; font-size: 13px;
-  display: flex; flex-direction: column; gap: 4px;
+.turn { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.dot  { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; }
+.dot.b { background: #111; border: 1px solid #555; }
+.dot.w { background: #F0F0F0; border: 1px solid #666; }
+
+/* ── Buttons ── */
+.br { display: flex; gap: 2px; }
+
+.b {
+  font-family: var(--mono); font-size: 12px; font-weight: 500;
+  padding: 6px 8px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--muted); cursor: pointer;
+  transition: background 0.1s, color 0.1s;
 }
-.move-list .entry {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 12px; border-radius: 6px; background: var(--surface);
-  border: 1px solid transparent; transition: border 0.2s ease;
+.b:hover { background: var(--surface); color: var(--text); }
+.b.on    { background: var(--text); color: var(--bg); border-color: var(--text); }
+.b:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+
+.br .b { flex: 1; text-align: center; }
+
+.bf {
+  display: block; width: 100%; text-align: center; padding: 8px;
+  font-family: var(--mono); font-size: 12px; font-weight: 500;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--muted); cursor: pointer; margin-top: 8px;
 }
-.move-list .entry:hover { border-color: var(--border); }
-.move-list .entry .num { color: var(--muted); font-variant-numeric: tabular-nums; width: 32px; }
-.move-list .entry .coord { font-weight: 600; color: var(--text); }
-.move-list .entry .player-b { color: #d4d4d8; display: flex; align-items: center; gap: 6px; }
-.move-list .entry .player-w { color: #d4d4d8; display: flex; align-items: center; gap: 6px; }
-.move-list .entry .player-b::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #18181b; border: 1px solid #52525b; box-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-.move-list .entry .player-w::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #f4f4f5; border: 1px solid #a1a1aa; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+.bf:hover { background: var(--surface); color: var(--text); }
+.bf:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
 
-/* Score card */
-.score-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px; text-align: center;
+.ba { display: flex; gap: 2px; margin-top: 8px; }
+.ba .b { flex: 1; text-align: center; }
+
+/* ── Kifu Table ── */
+.kifu {
+  font-family: var(--mono); font-size: 12px; width: 100%;
+  border-collapse: collapse;
 }
-.score-card .label { color: var(--muted); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
-.score-card .value { font-size: 24px; font-weight: 600; color: var(--text); margin-top: 4px; font-variant-numeric: tabular-nums; }
-
-/* ───────── Analysis Table ───────── */
-.results-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
-.results-table th {
-  text-align: left; padding: 8px 12px; color: var(--muted);
-  font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border);
+.kifu th {
+  text-align: left; color: var(--dim); font-weight: 500;
+  padding: 3px 5px; border-bottom: 1px solid var(--border); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.04em;
 }
-.results-table td { padding: 10px 12px; border-bottom: 1px solid var(--surface); font-variant-numeric: tabular-nums; }
-.results-table tr:hover td { background: var(--surface); }
-.results-table tr:last-child td { border-bottom: none; }
+.kifu td { padding: 2px 5px; color: var(--muted); }
+.kifu tr:last-child td { color: var(--text); }
 
-/* ───────── Visualizer Stats ───────── */
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.stat-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 4px;
+/* ── Analysis / Vis Tables ── */
+.at {
+  font-family: var(--mono); font-size: 12px; width: 100%;
+  border-collapse: collapse;
 }
-.stat-card .label { font-size: 12px; color: var(--muted); font-weight: 500; }
-.stat-card .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.stat-card.best { grid-column: span 2; background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2); }
-.stat-card.best .value { color: var(--accent); display: flex; align-items: baseline; justify-content: space-between; }
-.stat-card.best .wr { font-size: 14px; font-weight: 500; color: var(--success); }
-
-/* bar chart */
-.bar-chart { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-.bar-row { display: flex; align-items: center; gap: 12px; font-size: 12px; }
-.bar-row .bar-label { width: 28px; text-align: right; font-weight: 600; color: var(--text); }
-.bar-row .bar-track { flex: 1; height: 8px; background: var(--surface); border-radius: 4px; overflow: hidden; }
-.bar-row .bar-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-.bar-row .bar-val { width: 44px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
-
-/* progress bar */
-.progress-wrap { width: 100%; height: 4px; background: var(--surface); border-radius: 2px; overflow: hidden; margin-top: -8px; }
-.progress-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.2s ease; }
-
-/* ───────── Toast Notifications ───────── */
-#toast-container { position: fixed; bottom: 32px; right: 32px; display: flex; flex-direction: column; gap: 12px; z-index: 1000; pointer-events: none; }
-.toast {
-  pointer-events: auto; padding: 14px 20px; border-radius: 8px; font-size: 14px; font-weight: 500;
-  display: flex; align-items: center; gap: 12px; min-width: 300px;
-  background: var(--surface); border: 1px solid var(--border); color: var(--text);
-  box-shadow: var(--shadow-lg);
-  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.at th {
+  text-align: left; color: var(--dim); font-weight: 500;
+  padding: 3px 5px; border-bottom: 1px solid var(--border);
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
 }
-.toast::before { content: ""; width: 8px; height: 8px; border-radius: 50%; display: block; flex-shrink: 0; }
-.toast.success::before { background: var(--success); box-shadow: 0 0 8px var(--success); }
-.toast.error::before { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
-.toast.info::before { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-.toast.dismiss { animation: slideOut 0.2s cubic-bezier(0.7, 0, 0.84, 0) forwards; }
+.at td { padding: 3px 5px; }
 
-/* ───────── Keyframes ───────── */
-@keyframes pulse { 0%,100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
-@keyframes slideIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes slideOut { to { opacity: 0; transform: translateY(16px) scale(0.95); } }
+/* ── Bar Chart ── */
+.bar { display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11px; margin-bottom: 3px; }
+.bar-l { width: 30px; text-align: right; color: var(--muted); }
+.bar-t { flex: 1; height: 10px; background: var(--bg); }
+.bar-f { height: 100%; }
+.bar-v { width: 32px; color: var(--dim); }
+
+/* ── Thinking ── */
+.thk { color: var(--warm); }
+.hint { font-family: var(--mono); font-size: 10px; color: var(--dim); margin-top: 5px; }
 </style>
 </head>
 <body>
 
-<!-- ═══════ NAV ═══════ -->
-<nav>
-  <div class="logo">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
-    Scy Engine
-  </div>
-  <div class="nav-links">
-    <button class="active" onclick="switchMode('play')" id="nav-play">Play</button>
-    <button onclick="switchMode('analysis')" id="nav-analysis">Analysis</button>
-    <button onclick="switchMode('visualizer')" id="nav-visualizer">Visualizer</button>
-  </div>
-</nav>
-
-<!-- ═══════ APP ═══════ -->
-<div class="app">
-
-  <!-- Board Column -->
-  <div class="board-col">
-    <svg id="board-svg"></svg>
-    <div class="status-bar" id="status-bar"></div>
-  </div>
-
-  <!-- Side Panel -->
-  <div class="side-panel" id="side-panel"></div>
-
+<div id="app">
+  <header>
+    <span class="brand">Scy Engine</span>
+    <nav>
+      <button class="mtab on" id="t-play" onclick="switchMode('play')">Play</button>
+      <button class="mtab" id="t-analysis" onclick="switchMode('analysis')">Analysis</button>
+      <button class="mtab" id="t-visualizer" onclick="switchMode('visualizer')">Visualize</button>
+    </nav>
+  </header>
+  <main>
+    <section id="board-area"><svg id="goban"></svg></section>
+    <aside>
+      <div id="panel"></div>
+      <div id="status">Ready</div>
+    </aside>
+  </main>
 </div>
 
-<!-- Toast container -->
-<div id="toast-container"></div>
-
 <script>
-/* ================================================================
+/* ═══════════════════════════════════════════════════════════════
    STATE
-   ================================================================ */
-const BOARD_SIZE = 9;
+   ═══════════════════════════════════════════════════════════════ */
 const EMPTY = 0, BLACK = 1, WHITE = 2;
-const COL_LABELS = ['A','B','C','D','E','F','G','H','J']; // skip I
+const GTP_COLS = 'ABCDEFGHJKLMNOPQRST';
+const PAD = 28;
 
-let currentMode   = 'play';   // 'play' | 'analysis' | 'visualizer'
-let boardState     = [];       // 2D array [row][col], 0/1/2
-let isThinking     = false;
-let currentPlayer  = BLACK;
-let moveCount      = 0;
-let captures       = { 1:0, 2:0 };
-let moveHistory    = [];       // [{num, player, row, col, pass}]
-let lastMove       = null;     // {row, col} or null
-let analysisOverlay = [];      // [{row,col,win_rate,visits,ucb1,rank}]
-let simulations    = 1000;
-let visualizerSource = null;   // EventSource
-let gameOver       = false;
+let BOARD_SIZE   = 19;
+let boardState   = [];
+let currentPlayer = BLACK;
+let moveCount    = 0;
+let captures     = { black: 0, white: 0 };
+let moveHistory  = [];
+let lastMove     = null;
+let gameOver     = false;
+let isThinking   = false;
+let simulations  = 100;
+let currentMode  = 'play';
+let analysisOverlay = [];
+let visualizerSource = null;
+let hoverPos     = null;
 
-// Board drawing constants
-const CELL   = 45;
-const PAD    = 36;  // padding for coordinate labels
-const STONE_R = 18;
-const STAR_R  = 4;
-const SVG_SIZE = PAD + CELL * (BOARD_SIZE - 1) + PAD;
+/* ═══════════════════════════════════════════════════════════════
+   COORDINATE HELPERS
+   ═══════════════════════════════════════════════════════════════ */
+function rowColToGTP(r, c) { return GTP_COLS[c] + (BOARD_SIZE - r); }
+function formatCoord(r, c) { return (r < 0 || c < 0) ? 'pass' : rowColToGTP(r, c); }
+function playerName(p)     { return p === BLACK ? 'Black' : 'White'; }
 
-// Star (hoshi) points for 9×9 — 0-indexed
-const HOSHI = [[2,2],[2,6],[6,2],[6,6],[4,4]];
+/* ═══════════════════════════════════════════════════════════════
+   SVG HELPERS
+   ═══════════════════════════════════════════════════════════════ */
+function sv(tag, a) {
+  const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in a) e.setAttribute(k, a[k]);
+  return e;
+}
 
-/* ================================================================
-   INIT
-   ================================================================ */
+function sText(x, y, str, opts) {
+  const o = opts || {};
+  const e = sv('text', {
+    x: x, y: y,
+    'text-anchor':       o.anchor   || 'middle',
+    'dominant-baseline': o.baseline || 'central',
+    'font-family':       "'JetBrains Mono', monospace",
+    'font-size':         o.size     || 10,
+    'font-weight':       o.weight   || 400,
+    fill:                o.fill     || '#7D8590',
+    'pointer-events':    'none'
+  });
+  if (o.stroke) {
+    e.setAttribute('stroke',      o.stroke);
+    e.setAttribute('stroke-width', o.strokeW || 2.5);
+    e.setAttribute('paint-order', 'stroke fill');
+  }
+  e.textContent = str;
+  return e;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HEAT MAP — MCTS visit density overlay
+   ═══════════════════════════════════════════════════════════════ */
+function heatRGB(wr) {
+  // #3F88A8 (cool, low wr) → #CF5C36 (warm, high wr)
+  var t = Math.max(0, Math.min(1, wr));
+  return 'rgb(' +
+    Math.round(63  + (207-63)  * t) + ',' +
+    Math.round(136 + (92-136)  * t) + ',' +
+    Math.round(168 + (54-168)  * t) + ')';
+}
+
+function renderHeat(orig, fs) {
+  if (!analysisOverlay.length) return;
+  var svg = document.getElementById('goban');
+  var maxV = 1;
+  for (var i = 0; i < analysisOverlay.length; i++)
+    if (analysisOverlay[i].visits > maxV) maxV = analysisOverlay[i].visits;
+
+  for (var i = 0; i < analysisOverlay.length; i++) {
+    var m  = analysisOverlay[i];
+    var cx = orig + m.col * fs;
+    var cy = orig + m.row * fs;
+    // radius ∝ √(visits / max)
+    var norm = Math.sqrt(m.visits / maxV);
+    var r    = fs * 0.46 * Math.max(0.28, norm);
+    var col  = heatRGB(m.win_rate);
+
+    svg.appendChild(sv('circle', {
+      cx: cx, cy: cy, r: r,
+      fill: col, opacity: 0.55, 'pointer-events': 'none'
+    }));
+
+    // labelled text on top candidates
+    if (i < 7) {
+      var fz = Math.max(8, fs * 0.30);
+      svg.appendChild(sText(cx, cy - 1,
+        (m.win_rate * 100).toFixed(1),
+        { size: fz, weight: 600, fill: '#FFF', stroke: 'rgba(0,0,0,0.55)', strokeW: 2.5 }
+      ));
+      if (fs > 22) {
+        svg.appendChild(sText(cx, cy + fz * 0.85,
+          String(m.visits),
+          { size: Math.max(7, fs * 0.22), fill: 'rgba(255,255,255,0.55)' }
+        ));
+      }
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GOBAN RENDERING
+   ═══════════════════════════════════════════════════════════════ */
+function metrics() {
+  var a = document.getElementById('board-area');
+  var av = Math.min(a.clientWidth - 16, a.clientHeight - 16);
+  var tot = Math.max(360, Math.min(700, av));
+  var fs  = (tot - 2 * PAD) / (BOARD_SIZE - 1);
+  return { tot: tot, fs: fs, o: PAD };
+}
+
+function hoshi() {
+  if (BOARD_SIZE === 19) return [[3,3],[3,9],[3,15],[9,3],[9,9],[9,15],[15,3],[15,9],[15,15]];
+  if (BOARD_SIZE === 13) return [[3,3],[3,9],[6,6],[9,3],[9,9]];
+  if (BOARD_SIZE === 9)  return [[2,2],[2,6],[4,4],[6,2],[6,6]];
+  return [];
+}
+
+function renderGoban() {
+  var svg = document.getElementById('goban');
+  var m   = metrics();
+  var tot = m.tot, fs = m.fs, o = m.o;
+  var end = o + (BOARD_SIZE - 1) * fs;
+
+  svg.setAttribute('width',   tot);
+  svg.setAttribute('height',  tot);
+  svg.setAttribute('viewBox', '0 0 ' + tot + ' ' + tot);
+  svg.innerHTML = '';
+
+  // background
+  svg.appendChild(sv('rect', { x:0, y:0, width:tot, height:tot, fill:'#D4A843' }));
+
+  // grid
+  for (var i = 0; i < BOARD_SIZE; i++) {
+    var p = o + i * fs;
+    svg.appendChild(sv('line', { x1:p, y1:o, x2:p, y2:end, stroke:'#111', 'stroke-width':1, 'shape-rendering':'crispEdges' }));
+    svg.appendChild(sv('line', { x1:o, y1:p, x2:end, y2:p, stroke:'#111', 'stroke-width':1, 'shape-rendering':'crispEdges' }));
+  }
+
+  // star points
+  var stars = hoshi();
+  for (var i = 0; i < stars.length; i++) {
+    svg.appendChild(sv('circle', { cx: o + stars[i][1] * fs, cy: o + stars[i][0] * fs, r: 2.5, fill: '#111' }));
+  }
+
+  // coordinates (A–T skip I, 1–19)
+  for (var i = 0; i < BOARD_SIZE; i++) {
+    var p = o + i * fs;
+    svg.appendChild(sText(p, o - 13,   GTP_COLS[i]));
+    svg.appendChild(sText(p, end + 14,  GTP_COLS[i]));
+    svg.appendChild(sText(o - 15,   p,  String(BOARD_SIZE - i), { anchor: 'end' }));
+    svg.appendChild(sText(end + 15, p,  String(BOARD_SIZE - i), { anchor: 'start' }));
+  }
+
+  // stones
+  var sr = fs * 0.47;
+  for (var r = 0; r < BOARD_SIZE; r++) {
+    for (var c = 0; c < BOARD_SIZE; c++) {
+      var s = boardState[r] ? boardState[r][c] : EMPTY;
+      if (s === EMPTY) continue;
+      var cx = o + c * fs, cy = o + r * fs;
+      if (s === BLACK) {
+        svg.appendChild(sv('circle', { cx:cx, cy:cy, r:sr, fill:'#111' }));
+      } else {
+        svg.appendChild(sv('circle', { cx:cx, cy:cy, r:sr, fill:'#F0F0F0', stroke:'#444', 'stroke-width':1 }));
+      }
+    }
+  }
+
+  // last-move marker (contrasting dot)
+  if (lastMove && lastMove.row >= 0 && lastMove.col >= 0) {
+    var lx = o + lastMove.col * fs;
+    var ly = o + lastMove.row * fs;
+    var ls = boardState[lastMove.row][lastMove.col];
+    svg.appendChild(sv('circle', {
+      cx:lx, cy:ly, r: fs * 0.14,
+      fill: ls === BLACK ? '#F0F0F0' : '#111', opacity: 0.8
+    }));
+  }
+
+  // MCTS density overlay
+  renderHeat(o, fs);
+
+  // ghost stone (re-draw if mouse was hovering)
+  if (hoverPos) drawGhost(hoverPos.row, hoverPos.col, o, fs);
+
+  // transparent hit-area for mouse events
+  var hit = sv('rect', { x:0, y:0, width:tot, height:tot, fill:'transparent', cursor:'crosshair' });
+  hit.addEventListener('mousemove', function(e) {
+    var rect = svg.getBoundingClientRect();
+    var col = Math.round((e.clientX - rect.left - o) / fs);
+    var row = Math.round((e.clientY - rect.top  - o) / fs);
+    onHover(row, col, o, fs);
+  });
+  hit.addEventListener('mouseleave', function() { clearGhost(); });
+  hit.addEventListener('click', function(e) {
+    var rect = svg.getBoundingClientRect();
+    var col = Math.round((e.clientX - rect.left - o) / fs);
+    var row = Math.round((e.clientY - rect.top  - o) / fs);
+    if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) handleClick(row, col);
+  });
+  svg.appendChild(hit);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GHOST STONE
+   ═══════════════════════════════════════════════════════════════ */
+function onHover(r, c, o, fs) {
+  if (isThinking || gameOver) { clearGhost(); return; }
+  if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE) { clearGhost(); return; }
+  if (!boardState[r] || boardState[r][c] !== EMPTY) { clearGhost(); return; }
+  if (currentMode === 'play' && currentPlayer !== BLACK) { clearGhost(); return; }
+  if (hoverPos && hoverPos.row === r && hoverPos.col === c) return;
+  clearGhost();
+  drawGhost(r, c, o, fs);
+  hoverPos = { row: r, col: c };
+}
+
+function drawGhost(r, c, o, fs) {
+  var svg = document.getElementById('goban');
+  var isB = currentMode === 'analysis' || currentPlayer === BLACK;
+  svg.appendChild(sv('circle', {
+    cx: o + c * fs, cy: o + r * fs, r: fs * 0.44,
+    fill: isB ? '#111' : '#F0F0F0',
+    stroke: isB ? 'none' : '#444', 'stroke-width': isB ? 0 : 1,
+    opacity: 0.25, id: 'ghost', 'pointer-events': 'none'
+  }));
+}
+
+function clearGhost() {
+  var g = document.getElementById('ghost');
+  if (g) g.remove();
+  hoverPos = null;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BOARD CLICK
+   ═══════════════════════════════════════════════════════════════ */
+function handleClick(r, c) {
+  if (isThinking) return;
+  if (currentMode === 'play')     makeMove(r, c);
+  if (currentMode === 'analysis') toggleStone(r, c);
+}
+
+function toggleStone(r, c) {
+  if      (boardState[r][c] === EMPTY) boardState[r][c] = BLACK;
+  else if (boardState[r][c] === BLACK) boardState[r][c] = WHITE;
+  else                                 boardState[r][c] = EMPTY;
+  analysisOverlay = [];
+  updateUI();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STATE INIT
+   ═══════════════════════════════════════════════════════════════ */
 function initBoard() {
   boardState = [];
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    boardState.push(new Array(BOARD_SIZE).fill(EMPTY));
-  }
+  for (var r = 0; r < BOARD_SIZE; r++) boardState.push(new Array(BOARD_SIZE).fill(EMPTY));
   currentPlayer = BLACK;
   moveCount = 0;
-  captures = { 1:0, 2:0 };
+  captures = { black: 0, white: 0 };
   moveHistory = [];
   lastMove = null;
   analysisOverlay = [];
   gameOver = false;
 }
 
-initBoard();
-
-/* ================================================================
-   SVG BOARD RENDERING
-   ================================================================ */
-function boardX(col) { return PAD + col * CELL; }
-function boardY(row) { return PAD + row * CELL; }
-
-function buildSVG() {
-  const svg = document.getElementById('board-svg');
-  svg.setAttribute('width', SVG_SIZE);
-  svg.setAttribute('height', SVG_SIZE);
-  svg.setAttribute('viewBox', `0 0 ${SVG_SIZE} ${SVG_SIZE}`);
-  svg.innerHTML = '';
-
-  // — Defs: gradients —
-  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
-
-  // Black stone gradient
-  const gBlack = radialGrad('grad-black', [
-    {offset:'0%',  color:'#555'},
-    {offset:'50%', color:'#333'},
-    {offset:'100%',color:'#111'}
-  ], 0.35, 0.35);
-  defs.appendChild(gBlack);
-
-  // White stone gradient
-  const gWhite = radialGrad('grad-white', [
-    {offset:'0%',  color:'#ffffff'},
-    {offset:'55%', color:'#f0f0f0'},
-    {offset:'100%',color:'#d0d0d0'}
-  ], 0.38, 0.32);
-  defs.appendChild(gWhite);
-
-  // Hover gradients
-  const gHoverB = radialGrad('grad-hover-black', [
-    {offset:'0%',  color:'rgba(80,80,80,0.45)'},
-    {offset:'100%',color:'rgba(17,17,17,0.35)'}
-  ], 0.35, 0.35);
-  defs.appendChild(gHoverB);
-
-  const gHoverW = radialGrad('grad-hover-white', [
-    {offset:'0%',  color:'rgba(255,255,255,0.45)'},
-    {offset:'100%',color:'rgba(208,208,208,0.35)'}
-  ], 0.38, 0.32);
-  defs.appendChild(gHoverW);
-
-  // Shadow filter
-  const filt = document.createElementNS('http://www.w3.org/2000/svg','filter');
-  filt.setAttribute('id','shadow');
-  filt.innerHTML = '<feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.4"/>';
-  defs.appendChild(filt);
-
-  // Board background gradient
-  const gBoard = radialGrad('grad-board', [
-    {offset:'0%', color:'#E5C396'},
-    {offset:'100%', color:'#CFA975'}
-  ], 0.5, 0.5);
-  defs.appendChild(gBoard);
-
-  svg.appendChild(defs);
-
-  // — Wood background —
-  const bg = svgEl('rect', {
-    x:0, y:0, width:SVG_SIZE, height:SVG_SIZE,
-    rx:10, fill:'url(#grad-board)'
-  });
-  svg.appendChild(bg);
-
-  // — Grid lines —
-  for (let i = 0; i < BOARD_SIZE; i++) {
-    // vertical
-    svg.appendChild(svgEl('line', {
-      x1:boardX(i), y1:boardY(0),
-      x2:boardX(i), y2:boardY(BOARD_SIZE-1),
-      stroke:'#5D4037', 'stroke-width':1
-    }));
-    // horizontal
-    svg.appendChild(svgEl('line', {
-      x1:boardX(0), y1:boardY(i),
-      x2:boardX(BOARD_SIZE-1), y2:boardY(i),
-      stroke:'#5D4037', 'stroke-width':1
-    }));
-  }
-
-  // — Star points —
-  HOSHI.forEach(([r,c]) => {
-    svg.appendChild(svgEl('circle', {
-      cx:boardX(c), cy:boardY(r), r:STAR_R, fill:'#5D4037'
-    }));
-  });
-
-  // — Coordinate labels —
-  for (let i = 0; i < BOARD_SIZE; i++) {
-    // Column labels (bottom)
-    svg.appendChild(svgText(boardX(i), SVG_SIZE - 10, COL_LABELS[i], 12, '#5D4037'));
-    // Row labels (left) — Go convention: row 1 at bottom
-    svg.appendChild(svgText(10, boardY(i) + 4, String(BOARD_SIZE - i), 12, '#5D4037'));
-  }
-
-  // — Click / Hover targets layer —
-  const interactionGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
-  interactionGroup.setAttribute('id','interact-layer');
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
-      const rect = svgEl('rect', {
-        x: boardX(c) - CELL/2,
-        y: boardY(r) - CELL/2,
-        width: CELL, height: CELL,
-        fill: 'transparent', cursor: 'pointer',
-        'data-row': r, 'data-col': c
-      });
-      rect.addEventListener('click', () => handleBoardClick(r, c));
-      rect.addEventListener('mouseenter', () => showHover(r, c));
-      rect.addEventListener('mouseleave', clearHover);
-      interactionGroup.appendChild(rect);
-    }
-  }
-  svg.appendChild(interactionGroup);
-
-  // — Stones layer —
-  const stonesGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
-  stonesGroup.setAttribute('id','stones-layer');
-  svg.appendChild(stonesGroup);
-
-  // — Overlay layer (analysis / visualizer) —
-  const overlayGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
-  overlayGroup.setAttribute('id','overlay-layer');
-  svg.appendChild(overlayGroup);
-
-  // — Hover preview layer —
-  const hoverGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
-  hoverGroup.setAttribute('id','hover-layer');
-  hoverGroup.setAttribute('pointer-events','none');
-  svg.appendChild(hoverGroup);
-}
-
-function renderBoard() {
-  const layer = document.getElementById('stones-layer');
-  if (!layer) return;
-  layer.innerHTML = '';
-
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
-      const s = boardState[r][c];
-      if (s === EMPTY) continue;
-      const cx = boardX(c), cy = boardY(r);
-      const gradId = s === BLACK ? 'grad-black' : 'grad-white';
-
-      // stone with drop shadow filter
-      layer.appendChild(svgEl('circle', {
-        cx, cy, r: STONE_R,
-        fill: `url(#${gradId})`,
-        stroke: s === BLACK ? '#18181b' : '#e4e4e7',
-        'stroke-width': 1,
-        filter: 'url(#shadow)'
-      }));
-    }
-  }
-
-  // Last-move indicator
-  if (lastMove) {
-    layer.appendChild(svgEl('circle', {
-      cx: boardX(lastMove.col),
-      cy: boardY(lastMove.row),
-      r: 5, fill: '#ef4444'
-    }));
-  }
-
-  renderAnalysisOverlayOnSVG();
-}
-
-function renderAnalysisOverlayOnSVG() {
-  const layer = document.getElementById('overlay-layer');
-  if (!layer) return;
-  layer.innerHTML = '';
-  if (analysisOverlay.length === 0) return;
-
-  analysisOverlay.forEach((m, i) => {
-    const cx = boardX(m.col), cy = boardY(m.row);
-    const color = i === 0 ? 'rgba(34,197,94,0.45)' : 'rgba(14,165,233,0.35)';
-    layer.appendChild(svgEl('circle', {
-      cx, cy, r: STONE_R, fill: color
-    }));
-    // Win rate text
-    const wr = (m.win_rate * 100).toFixed(0) + '%';
-    const txt = svgText(cx, cy + 4, wr, 11, '#fff');
-    txt.setAttribute('font-weight', '700');
-    txt.setAttribute('text-anchor', 'middle');
-    txt.setAttribute('pointer-events', 'none');
-    layer.appendChild(txt);
-  });
-}
-
-/* Hover preview */
-function showHover(r, c) {
-  if (isThinking || gameOver) return;
-  if (boardState[r][c] !== EMPTY) return;
-  // In analysis mode, always show a black stone preview for placement
-  if (currentMode === 'play' && currentPlayer !== BLACK) return;
-
-  const layer = document.getElementById('hover-layer');
-  layer.innerHTML = '';
-
-  let gradId;
-  if (currentMode === 'analysis') {
-    gradId = 'grad-hover-black'; // analysis places stones freely
-  } else {
-    gradId = currentPlayer === BLACK ? 'grad-hover-black' : 'grad-hover-white';
-  }
-  layer.appendChild(svgEl('circle', {
-    cx: boardX(c), cy: boardY(r), r: STONE_R,
-    fill: `url(#${gradId})`
-  }));
-}
-
-function clearHover() {
-  const layer = document.getElementById('hover-layer');
-  if (layer) layer.innerHTML = '';
-}
-
-/* SVG helpers */
-function svgEl(tag, attrs) {
-  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
-  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, v);
-  return el;
-}
-function svgText(x, y, content, size, fill) {
-  const t = svgEl('text', {
-    x, y, fill, 'font-size': size,
-    'font-family': 'Inter,sans-serif',
-    'text-anchor': 'middle',
-    'dominant-baseline': 'central'
-  });
-  t.textContent = content;
-  return t;
-}
-function radialGrad(id, stops, fx, fy) {
-  const g = document.createElementNS('http://www.w3.org/2000/svg','radialGradient');
-  g.setAttribute('id', id);
-  g.setAttribute('cx','50%'); g.setAttribute('cy','50%');
-  g.setAttribute('fx', (fx*100)+'%'); g.setAttribute('fy', (fy*100)+'%');
-  g.setAttribute('r','50%');
-  stops.forEach(s => {
-    const st = document.createElementNS('http://www.w3.org/2000/svg','stop');
-    st.setAttribute('offset', s.offset);
-    st.setAttribute('stop-color', s.color);
-    g.appendChild(st);
-  });
-  return g;
-}
-
-/* ================================================================
-   FORMAT HELPERS
-   ================================================================ */
-function formatCoord(row, col) {
-  if (row < 0 || col < 0) return 'Pass';
-  return COL_LABELS[col] + (BOARD_SIZE - row);
-}
-
-function playerName(p) { return p === BLACK ? 'Black' : 'White'; }
-
-/* ================================================================
-   STATUS BAR
-   ================================================================ */
-function renderStatusBar() {
-  const sb = document.getElementById('status-bar');
-  const dotCls = currentPlayer === BLACK ? 'black' : 'white';
-  const thinkHTML = isThinking
-    ? `<div class="thinking"><span></span><span></span><span></span></div>`
-    : '';
-
-  sb.innerHTML = `
-    <span><span class="dot ${dotCls}"></span>${playerName(currentPlayer)}'s turn</span>
-    <span style="color:var(--muted)">Move ${moveCount}</span>
-    <span style="color:var(--muted)">B: ${captures[BLACK]}  W: ${captures[WHITE]}</span>
-    ${isThinking ? `<span style="color:var(--accent)">Engine Thinking${thinkHTML}</span>` : ''}
-    <span class="spacer"></span>
-    <button onclick="passMove()" ${isThinking || gameOver ? 'disabled' : ''}>Pass</button>
-    <button onclick="newGame()">New Game</button>
-  `;
-}
-
-/* ================================================================
-   SIDE PANEL RENDERING
-   ================================================================ */
-function renderSidePanel() {
-  const panel = document.getElementById('side-panel');
-  if (currentMode === 'play')        panel.innerHTML = renderPlayPanel();
-  else if (currentMode === 'analysis') panel.innerHTML = renderAnalysisPanel();
-  else                                 panel.innerHTML = renderVisualizerPanel();
-}
-
-function simButtons() {
-  return [500,1000,3000,5000].map(n =>
-    `<button class="${n===simulations?'active':''}" onclick="setSimulations(${n})">${n.toLocaleString()}</button>`
-  ).join('');
-}
-
-/* ──── Play Panel ──── */
-function renderPlayPanel() {
-  let histHTML = '';
-  moveHistory.forEach(m => {
-    const cls = m.player === BLACK ? 'player-b' : 'player-w';
-    const coord = m.pass ? 'Pass' : formatCoord(m.row, m.col);
-    histHTML += `<div class="entry"><span class="num">#${m.num}</span><span class="coord ${cls}">${playerName(m.player)}: ${coord}</span></div>`;
-  });
-
-  return `
-    <div class="panel-title">Human vs AI</div>
-    <div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">MCTS Simulations</div>
-      <div class="sim-group">${simButtons()}</div>
-    </div>
-    <div class="panel-title" style="margin-top:4px;">Move History</div>
-    <div class="move-list" id="move-list">${histHTML || '<div style="color:var(--muted);text-align:center;padding:16px;">No moves yet</div>'}</div>
-    <div class="score-card">
-      <div class="label">Score Estimate</div>
-      <div class="value" id="score-display">—</div>
-    </div>
-  `;
-}
-
-/* ──── Analysis Panel ──── */
-function renderAnalysisPanel() {
-  let tableRows = '';
-  analysisOverlay.forEach((m, i) => {
-    tableRows += `<tr>
-      <td>${i+1}</td>
-      <td style="font-weight:600">${formatCoord(m.row, m.col)}</td>
-      <td>${m.visits}</td>
-      <td style="color:${m.win_rate >= 0.5 ? 'var(--success)' : 'var(--danger)'}">${(m.win_rate*100).toFixed(1)}%</td>
-      <td>${m.ucb1 != null ? m.ucb1.toFixed(3) : '—'}</td>
-    </tr>`;
-  });
-
-  return `
-    <div class="panel-title">Position Analysis</div>
-    <div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Simulations</div>
-      <div class="sim-group">${simButtons()}</div>
-    </div>
-    <button class="btn-primary" onclick="analysePosition()" ${isThinking?'disabled':''}>
-      ${isThinking ? 'Analysing…' : 'Analyse Position'}
-    </button>
-    <div style="font-size:11px;color:var(--muted);">Click board to place / remove stones freely.</div>
-    ${tableRows ? `
-    <div class="panel-title" style="margin-top:4px;">Results</div>
-    <table class="results-table">
-      <thead><tr><th>#</th><th>Move</th><th>Visits</th><th>Win%</th><th>UCB1</th></tr></thead>
-      <tbody>${tableRows}</tbody>
-    </table>` : ''}
-  `;
-}
-
-/* ──── Visualizer Panel ──── */
-function renderVisualizerPanel() {
-  return `
-    <div class="panel-title">Algorithm Visualizer</div>
-    <div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Simulations</div>
-      <div class="sim-group">${simButtons()}</div>
-    </div>
-    <button class="btn-primary" id="btn-viz" onclick="runVisualizer()" ${isThinking?'disabled':''}>
-      ${isThinking ? 'Running…' : 'Run Visualizer'}
-    </button>
-    <div class="progress-wrap"><div class="progress-bar" id="viz-progress" style="width:0%"></div></div>
-    <div class="stat-big" id="viz-total">
-      <div class="label">Total Simulations</div>
-      <div class="value">0</div>
-    </div>
-    <div class="best-card" id="viz-best" style="display:none;">
-      <div class="label" style="font-size:10px;color:var(--muted);">Current Best Move</div>
-      <div class="move">—</div>
-      <div class="wr">—</div>
-    </div>
-    <div class="panel-title" style="margin-top:2px;">Top Nodes</div>
-    <table class="results-table" id="viz-table">
-      <thead><tr><th>Move</th><th>Visits</th><th>Win%</th><th>UCB1</th></tr></thead>
-      <tbody id="viz-tbody"></tbody>
-    </table>
-    <div class="panel-title" style="margin-top:2px;">Visit Distribution</div>
-    <div class="bar-chart" id="viz-bars"></div>
-  `;
-}
-
-/* ================================================================
-   MODE SWITCHING
-   ================================================================ */
-function switchMode(mode) {
-  if (mode === currentMode) return;
-  // stop any running visualizer
-  if (visualizerSource) { visualizerSource.close(); visualizerSource = null; }
-  isThinking = false;
-  currentMode = mode;
-  analysisOverlay = [];
-
-  // If switching to analysis or visualizer, keep board state; if switching to play, reset
-  if (mode === 'play') {
+/* ═══════════════════════════════════════════════════════════════
+   API — NEW GAME
+   ═══════════════════════════════════════════════════════════════ */
+async function newGame() {
+  isThinking = true; updateUI();
+  try {
+    var res = await fetch('/api/new_game', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ size: BOARD_SIZE })
+    });
+    var data = await res.json();
     initBoard();
-  }
-
-  // Update nav buttons
-  document.querySelectorAll('.nav-links button').forEach(btn => btn.classList.remove('active'));
-  document.getElementById('nav-' + mode)?.classList.add('active');
-
-  updateUI();
+    if (data.board_state)      boardState    = data.board_state;
+    if (data.current_player != null) currentPlayer = data.current_player;
+    if (data.captures)         captures      = data.captures;
+  } catch (e) { setStatus('err: ' + e.message); }
+  isThinking = false; updateUI();
 }
 
-/* ================================================================
-   UI REFRESH
-   ================================================================ */
-function updateUI() {
-  renderBoard();
-  renderStatusBar();
-  renderSidePanel();
-}
-
-function setSimulations(n) {
-  simulations = n;
-  renderSidePanel(); // re-render to update active button
-}
-
-/* ================================================================
-   BOARD CLICK HANDLER
-   ================================================================ */
-function handleBoardClick(row, col) {
-  if (isThinking) return;
-  if (currentMode === 'play')        return makeMove(row, col);
-  if (currentMode === 'analysis')    return toggleStone(row, col);
-  // visualizer: no board clicks needed during run
-}
-
-/* ──── Analysis: toggle stone ──── */
-function toggleStone(row, col) {
-  if (boardState[row][col] === EMPTY) {
-    boardState[row][col] = BLACK;
-  } else if (boardState[row][col] === BLACK) {
-    boardState[row][col] = WHITE;
-  } else {
-    boardState[row][col] = EMPTY;
-  }
-  analysisOverlay = [];
-  updateUI();
-}
-
-/* ================================================================
-   API: MAKE MOVE  (Play mode)
-   ================================================================ */
+/* ═══════════════════════════════════════════════════════════════
+   API — PLAYER MOVE
+   ═══════════════════════════════════════════════════════════════ */
 async function makeMove(row, col) {
-  if (gameOver) return;
-  if (currentPlayer !== BLACK) return; // player is always BLACK
-  if (boardState[row][col] !== EMPTY) {
-    showToast('Intersection is occupied', 'error');
-    return;
-  }
-
+  if (gameOver || currentPlayer !== BLACK) return;
+  if (boardState[row][col] !== EMPTY) return;
   isThinking = true;
-  updateUI();
+  setStatus('<span class="thk">searching ' + simulations + ' sims…</span>');
+  renderGoban(); renderPanel();
 
   try {
-    const res = await fetch('/api/move', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ row, col, simulations })
+    var res = await fetch('/api/move', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ row: row, col: col, simulations: simulations })
     });
-    const data = await res.json();
+    var data = await res.json();
     if (!res.ok) {
-      showToast(data.error || 'Illegal move', 'error');
-      isThinking = false;
-      updateUI();
-      return;
+      setStatus('illegal: ' + (data.error || ''));
+      isThinking = false; updateUI(); return;
     }
-    applyMoveResponse(data, row, col);
-  } catch (e) {
-    showToast('Network error: ' + e.message, 'error');
-  }
-  isThinking = false;
-  updateUI();
+    applyMove(data, row, col);
+  } catch (e) { setStatus('network err'); }
+  isThinking = false; updateUI();
 }
 
-function applyMoveResponse(data, playerRow, playerCol) {
-  // Update board from server
-  if (data.board_state) boardState = data.board_state;
-  if (data.captures) captures = data.captures;
-  if (data.move_count != null) moveCount = data.move_count;
+function applyMove(data, pR, pC) {
+  if (data.board_state)           boardState    = data.board_state;
+  if (data.captures)              captures      = data.captures;
+  if (data.move_count != null)    moveCount     = data.move_count;
   if (data.current_player != null) currentPlayer = data.current_player;
-  if (data.game_over) gameOver = true;
-  if (data.score) {
-    setTimeout(() => {
-      const el = document.getElementById('score-display');
-      if (el) el.textContent = `B: ${data.score.black} — W: ${data.score.white}`;
-    }, 50);
-  }
+  if (data.game_over)             gameOver      = true;
 
-  // Record player move
-  moveHistory.push({
-    num: moveHistory.length + 1,
-    player: BLACK,
-    row: playerRow,
-    col: playerCol,
-    pass: false
-  });
+  moveHistory.push({ num: moveHistory.length + 1, player: BLACK, row: pR, col: pC, pass: false });
 
-  // Record AI move (backend sends engine_move as [r,c] array or "pass")
   if (data.engine_move != null) {
     if (data.engine_move === 'pass') {
-      moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row:-1, col:-1, pass:true });
+      moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row: -1, col: -1, pass: true });
       lastMove = null;
     } else {
-      const em = data.engine_move;
-      moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row:em[0], col:em[1], pass:false });
-      lastMove = { row:em[0], col:em[1] };
+      var em = data.engine_move;
+      moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row: em[0], col: em[1], pass: false });
+      lastMove = { row: em[0], col: em[1] };
     }
   } else {
-    lastMove = { row:playerRow, col:playerCol };
+    lastMove = { row: pR, col: pC };
   }
 
-  if (data.game_over) {
-    showToast('Game Over! ' + (data.winner || ''), 'info');
+  if (data.game_over && data.score) {
+    setStatus('game over — ' + (data.winner || '') +
+      (data.score.black != null ? '  B:' + data.score.black + ' W:' + data.score.white : ''));
   }
 }
 
-/* ================================================================
-   API: PASS
-   ================================================================ */
+/* ═══════════════════════════════════════════════════════════════
+   API — PASS
+   ═══════════════════════════════════════════════════════════════ */
 async function passMove() {
   if (isThinking || gameOver) return;
   isThinking = true;
-  updateUI();
+  setStatus('<span class="thk">searching…</span>');
+  renderGoban(); renderPanel();
 
   try {
-    const res = await fetch('/api/pass', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ simulations })
+    var res = await fetch('/api/pass', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ simulations: simulations })
     });
-    const data = await res.json();
-    if (!res.ok) {
-      showToast(data.error || 'Pass failed', 'error');
-      isThinking = false;
-      updateUI();
-      return;
-    }
+    var data = await res.json();
+    if (!res.ok) { setStatus('pass failed'); isThinking = false; updateUI(); return; }
 
-    moveHistory.push({ num: moveHistory.length + 1, player: BLACK, row:-1, col:-1, pass:true });
-
-    if (data.board_state) boardState = data.board_state;
-    if (data.captures) captures = data.captures;
-    if (data.move_count != null) moveCount = data.move_count;
+    moveHistory.push({ num: moveHistory.length + 1, player: BLACK, row: -1, col: -1, pass: true });
+    if (data.board_state)           boardState    = data.board_state;
+    if (data.captures)              captures      = data.captures;
+    if (data.move_count != null)    moveCount     = data.move_count;
     if (data.current_player != null) currentPlayer = data.current_player;
 
     if (data.engine_move != null) {
       if (data.engine_move === 'pass') {
-        moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row:-1, col:-1, pass:true });
+        moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row: -1, col: -1, pass: true });
         lastMove = null;
       } else {
-        const em = data.engine_move;
-        moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row:em[0], col:em[1], pass:false });
-        lastMove = { row:em[0], col:em[1] };
+        var em = data.engine_move;
+        moveHistory.push({ num: moveHistory.length + 1, player: WHITE, row: em[0], col: em[1], pass: false });
+        lastMove = { row: em[0], col: em[1] };
       }
     }
-
-    if (data.game_over) {
-      gameOver = true;
-      showToast('Game Over! ' + (data.winner || ''), 'info');
-    }
-  } catch (e) {
-    showToast('Network error: ' + e.message, 'error');
-  }
-
-  isThinking = false;
-  updateUI();
+    if (data.game_over) { gameOver = true; setStatus('game over — ' + (data.winner || '')); }
+  } catch (e) { setStatus('network err'); }
+  isThinking = false; updateUI();
 }
 
-/* ================================================================
-   API: NEW GAME
-   ================================================================ */
-async function newGame() {
-  if (visualizerSource) { visualizerSource.close(); visualizerSource = null; }
-  isThinking = false;
-
-  try {
-    const res = await fetch('/api/new_game', { method: 'POST' });
-    const data = await res.json();
-    if (data.board_state) {
-      initBoard();
-      boardState = data.board_state;
-      if (data.current_player != null) currentPlayer = data.current_player;
-      moveCount = data.move_count || 0;
-      captures = data.captures || {black:0, white:0};
-      gameOver = false;
-      moveHistory = [];
-      lastMove = null;
-      showToast('New game started', 'success');
-    } else {
-      initBoard();
-      showToast('New game started', 'success');
-    }
-  } catch (e) {
-    initBoard();
-    showToast('New game (offline)', 'info');
-  }
-  updateUI();
-}
-
-/* ================================================================
-   API: ANALYSE POSITION
-   ================================================================ */
+/* ═══════════════════════════════════════════════════════════════
+   API — ANALYSIS
+   ═══════════════════════════════════════════════════════════════ */
 async function analysePosition() {
   isThinking = true;
-  analysisOverlay = [];
-  updateUI();
+  setStatus('<span class="thk">analysing ' + simulations + ' sims…</span>');
+  renderPanel();
 
   try {
-    const res = await fetch('/api/analyse', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ board_state: boardState, simulations })
+    var res = await fetch('/api/analyse', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ board_state: boardState, simulations: simulations })
     });
-    const data = await res.json();
-    if (!res.ok) {
-      showToast(data.error || 'Analysis failed', 'error');
-      isThinking = false;
-      updateUI();
-      return;
+    var data = await res.json();
+    if (data.candidates) {
+      analysisOverlay = data.candidates.map(function(c) {
+        return { row: c.move[0], col: c.move[1], win_rate: c.win_rate, visits: c.visits, ucb1: c.ucb1 };
+      });
     }
-    if (data.candidates && data.candidates.length) {
-      analysisOverlay = data.candidates.slice(0, 5).map((c, i) => ({
-        row: c.move[0],
-        col: c.move[1],
-        win_rate: c.win_rate,
-        visits: c.visits,
-        ucb1: c.ucb1,
-        rank: i + 1
-      }));
-    }
-    showToast('Analysis complete', 'success');
-  } catch (e) {
-    showToast('Network error: ' + e.message, 'error');
-  }
-
-  isThinking = false;
-  updateUI();
+  } catch (e) { setStatus('analysis err'); }
+  isThinking = false; updateUI();
 }
 
-/* ================================================================
-   API: VISUALIZER  (SSE)
-   ================================================================ */
+/* ═══════════════════════════════════════════════════════════════
+   API — VISUALIZER (SSE)
+   ═══════════════════════════════════════════════════════════════ */
 function runVisualizer() {
-  if (isThinking) return;
   if (visualizerSource) { visualizerSource.close(); visualizerSource = null; }
   isThinking = true;
-  analysisOverlay = [];
-  updateUI();
+  setStatus('<span class="thk">mcts visualizer running…</span>');
+  renderPanel();
 
-  const url = `/api/visualize?simulations=${simulations}&board_state=${encodeURIComponent(JSON.stringify(boardState))}`;
-  visualizerSource = new EventSource(url);
+  visualizerSource = new EventSource('/api/visualize?simulations=' + simulations);
 
-  visualizerSource.onmessage = function(event) {
-    try {
-      const data = JSON.parse(event.data);
-      updateVisualizerStats(data);
-    } catch (e) { /* ignore parse errors */ }
+  visualizerSource.onmessage = function(ev) {
+    updateVizStats(JSON.parse(ev.data));
   };
-
-  visualizerSource.addEventListener('done', function(event) {
-    try {
-      const data = JSON.parse(event.data);
-      updateVisualizerStats(data);
-      // Highlight best move on board
-      if (data.top_moves && data.top_moves.length > 0) {
-        const best = data.top_moves[0];
-        analysisOverlay = [{ row:best.move[0], col:best.move[1], win_rate:best.win_rate, visits:best.visits, ucb1:best.ucb1, rank:1 }];
-        renderBoard();
-      }
-    } catch (e) { /* */ }
-    visualizerSource.close();
-    visualizerSource = null;
-    isThinking = false;
-    showToast('Visualization complete', 'success');
-    renderStatusBar();
-    const btn = document.getElementById('btn-viz');
-    if (btn) { btn.disabled = false; btn.textContent = 'Run Visualizer'; }
+  visualizerSource.addEventListener('done', function() {
+    visualizerSource.close(); visualizerSource = null;
+    isThinking = false; setStatus('visualizer done'); renderPanel();
   });
-
   visualizerSource.onerror = function() {
-    visualizerSource.close();
-    visualizerSource = null;
-    isThinking = false;
-    showToast('Visualizer connection lost', 'error');
-    updateUI();
+    visualizerSource.close(); visualizerSource = null;
+    isThinking = false; setStatus('stream ended'); renderPanel();
   };
 }
 
-function updateVisualizerStats(data) {
-  // Total simulations
-  const totalEl = document.getElementById('viz-total');
-  if (totalEl && data.total_simulations != null) {
-    totalEl.querySelector('.value').textContent = data.total_simulations.toLocaleString();
+var lastVizRender = 0;
+function updateVizStats(data) {
+  var el;
+
+  el = document.getElementById('v-total');
+  if (el) el.textContent = data.total_simulations || 0;
+
+  el = document.getElementById('v-best');
+  if (el && data.best_move)
+    el.textContent = formatCoord(data.best_move[0], data.best_move[1]) +
+      ' ' + ((data.best_win_rate || 0) * 100).toFixed(1) + '%';
+
+  if (data.top_moves) {
+    analysisOverlay = data.top_moves.map(function(m) {
+      return { row: m.move[0], col: m.move[1], win_rate: m.win_rate, visits: m.visits, ucb1: m.ucb1 };
+    });
+    // throttle board redraws to ~10fps during streaming
+    var now = Date.now();
+    if (now - lastVizRender > 100) { lastVizRender = now; renderGoban(); }
   }
 
-  // Progress
-  const progEl = document.getElementById('viz-progress');
-  if (progEl && data.total_simulations != null) {
-    const pct = Math.min(100, (data.total_simulations / simulations) * 100);
-    progEl.style.width = pct + '%';
+  el = document.getElementById('v-tbody');
+  if (el && data.top_moves) {
+    el.innerHTML = data.top_moves.map(function(m) {
+      return '<tr><td>' + formatCoord(m.move[0], m.move[1]) + '</td><td>' +
+        m.visits + '</td><td>' + (m.win_rate * 100).toFixed(1) + '</td><td>' +
+        m.ucb1.toFixed(3) + '</td></tr>';
+    }).join('');
   }
 
-  // Best move card
-  const bestEl = document.getElementById('viz-best');
-  if (bestEl && data.top_moves && data.top_moves.length > 0) {
-    bestEl.style.display = 'block';
-    const b = data.top_moves[0];
-    bestEl.querySelector('.move').textContent = formatCoord(b.move[0], b.move[1]);
-    bestEl.querySelector('.wr').textContent = (b.win_rate * 100).toFixed(1) + '% win rate';
-  }
-
-  // Top nodes table
-  const tbody = document.getElementById('viz-tbody');
-  if (tbody && data.top_moves) {
-    tbody.innerHTML = data.top_moves.slice(0,5).map(n => `
-      <tr>
-        <td style="font-weight:600">${formatCoord(n.move[0], n.move[1])}</td>
-        <td>${n.visits}</td>
-        <td style="color:${n.win_rate >= 0.5 ? 'var(--success)' : 'var(--danger)'}">${(n.win_rate*100).toFixed(1)}%</td>
-        <td>${n.ucb1 != null ? n.ucb1.toFixed(3) : '—'}</td>
-      </tr>
-    `).join('');
-  }
-
-  // Bar chart
-  const bars = document.getElementById('viz-bars');
-  if (bars && data.top_moves) {
-    const maxV = Math.max(...data.top_moves.slice(0,5).map(n => n.visits), 1);
-    bars.innerHTML = data.top_moves.slice(0,5).map(n => {
-      const pct = (n.visits / maxV) * 100;
-      return `<div class="bar-row">
-        <span class="bar-label">${formatCoord(n.move[0], n.move[1])}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
-        <span class="bar-val">${n.visits}</span>
-      </div>`;
+  el = document.getElementById('v-bars');
+  if (el && data.top_moves) {
+    var maxV = Math.max.apply(null, data.top_moves.map(function(m) { return m.visits; }));
+    if (maxV < 1) maxV = 1;
+    el.innerHTML = data.top_moves.map(function(m) {
+      var pct = (m.visits / maxV * 100).toFixed(1);
+      var coord = formatCoord(m.move[0], m.move[1]);
+      var c = heatRGB(m.win_rate);
+      return '<div class="bar"><span class="bar-l">' + coord + '</span>' +
+        '<div class="bar-t"><div class="bar-f" style="width:' + pct + '%;background:' + c + '"></div></div>' +
+        '<span class="bar-v">' + m.visits + '</span></div>';
     }).join('');
   }
 }
 
-/* ================================================================
-   TOAST NOTIFICATIONS
-   ================================================================ */
-function showToast(message, type = 'info') {
-  const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.textContent = message;
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.classList.add('dismiss');
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
+/* ═══════════════════════════════════════════════════════════════
+   PANELS
+   ═══════════════════════════════════════════════════════════════ */
+function renderPanel() {
+  var p = document.getElementById('panel');
+  if      (currentMode === 'play')       p.innerHTML = playPanel();
+  else if (currentMode === 'analysis')   p.innerHTML = analysisPanel();
+  else                                   p.innerHTML = vizPanel();
 }
 
-/* ================================================================
-   BOOT
-   ================================================================ */
-buildSVG();
-updateUI();
+function sizeBtn() {
+  return [9, 13, 19].map(function(n) {
+    return '<button class="b' + (BOARD_SIZE === n ? ' on' : '') +
+      '" onclick="setBoardSize(' + n + ')">' + n + '×' + n + '</button>';
+  }).join('');
+}
 
-// Try to start a new game on the server
-fetch('/api/new_game', { method: 'POST' })
-  .then(r => r.json())
-  .then(data => {
-    if (data.board_state) {
-      boardState = data.board_state;
-      if (data.current_player != null) currentPlayer = data.current_player;
-      updateUI();
+function simBtn() {
+  return [50, 100, 500, 1000].map(function(n) {
+    return '<button class="b' + (simulations === n ? ' on' : '') +
+      '" onclick="setSimulations(' + n + ')">' + (n >= 1000 ? (n/1000) + 'k' : n) + '</button>';
+  }).join('');
+}
+
+/* ── Play ── */
+function playPanel() {
+  var tc = currentPlayer === BLACK ? 'b' : 'w';
+  var tn = playerName(currentPlayer);
+  var dis = isThinking || gameOver ? ' disabled' : '';
+  var dis2 = isThinking ? ' disabled' : '';
+
+  // kifu: paired move list
+  var kifu = '';
+  if (moveHistory.length === 0) {
+    kifu = '<div class="hint">No moves</div>';
+  } else {
+    kifu = '<table class="kifu"><thead><tr><th>#</th><th>B</th><th>W</th></tr></thead><tbody>';
+    for (var i = 0; i < moveHistory.length; i += 2) {
+      var bm = moveHistory[i];
+      var wm = i + 1 < moveHistory.length ? moveHistory[i + 1] : null;
+      var n  = Math.floor(i / 2) + 1;
+      var bc = bm.pass ? 'pass' : formatCoord(bm.row, bm.col);
+      var wc = wm ? (wm.pass ? 'pass' : formatCoord(wm.row, wm.col)) : '';
+      kifu += '<tr><td>' + n + '</td><td>' + bc + '</td><td>' + wc + '</td></tr>';
     }
-  })
-  .catch(() => { /* offline / server not running yet — that's fine */ });
+    kifu += '</tbody></table>';
+  }
+
+  return '' +
+    '<div class="sec">Board</div>' +
+    '<div class="br">' + sizeBtn() + '</div>' +
+
+    '<div class="sec">Simulations</div>' +
+    '<div class="br">' + simBtn() + '</div>' +
+
+    '<div class="sec">Position</div>' +
+    '<div class="turn"><div class="dot ' + tc + '"></div>' + tn + ' to play</div>' +
+    '<div style="margin-top:5px">' +
+      '<div class="dr"><span class="l">Move</span><span>' + moveCount + '</span></div>' +
+      '<div class="dr"><span class="l">B captures</span><span>' + (captures.black || 0) + '</span></div>' +
+      '<div class="dr"><span class="l">W captures</span><span>' + (captures.white || 0) + '</span></div>' +
+    '</div>' +
+
+    '<div class="ba">' +
+      '<button class="b"' + dis + ' onclick="passMove()">Pass</button>' +
+      '<button class="b"' + dis2 + ' onclick="if(confirm(\'Resign?\'))newGame()">Resign</button>' +
+      '<button class="b"' + dis2 + ' onclick="newGame()">New</button>' +
+    '</div>' +
+
+    '<div class="sec">Kifu</div>' +
+    '<div style="max-height:200px;overflow-y:auto">' + kifu + '</div>';
+}
+
+/* ── Analysis ── */
+function analysisPanel() {
+  var rows = '';
+  for (var i = 0; i < analysisOverlay.length; i++) {
+    var m = analysisOverlay[i];
+    rows += '<tr><td>' + (i+1) + '</td><td>' + formatCoord(m.row, m.col) +
+      '</td><td>' + m.visits + '</td><td>' + (m.win_rate * 100).toFixed(1) +
+      '</td><td>' + (m.ucb1 ? m.ucb1.toFixed(3) : '—') + '</td></tr>';
+  }
+
+  return '' +
+    '<div class="sec">Board</div>' +
+    '<div class="br">' + sizeBtn() + '</div>' +
+
+    '<div class="sec">Simulations</div>' +
+    '<div class="br">' + simBtn() + '</div>' +
+
+    '<button class="bf"' + (isThinking ? ' disabled' : '') + ' onclick="analysePosition()">' +
+      (isThinking ? 'analysing…' : 'Analyse Position') +
+    '</button>' +
+    '<div class="hint">Click intersections to place / remove stones</div>' +
+
+    (rows ?
+      '<div class="sec">Candidates</div>' +
+      '<table class="at"><thead><tr><th>#</th><th>Move</th><th>Vis</th><th>Win%</th><th>UCB1</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>'
+    : '');
+}
+
+/* ── Visualizer ── */
+function vizPanel() {
+  return '' +
+    '<div class="sec">Simulations</div>' +
+    '<div class="br">' + simBtn() + '</div>' +
+
+    '<button class="bf"' + (isThinking ? ' disabled' : '') + ' onclick="runVisualizer()">' +
+      (isThinking ? 'running…' : 'Run Visualizer') +
+    '</button>' +
+
+    '<div class="sec">Search</div>' +
+    '<div class="dr"><span class="l">Total</span><span id="v-total">0</span></div>' +
+    '<div class="dr"><span class="l">Best</span><span id="v-best">—</span></div>' +
+
+    '<div class="sec">Top Nodes</div>' +
+    '<table class="at"><thead><tr><th>Move</th><th>Vis</th><th>Win%</th><th>UCB1</th></tr></thead>' +
+    '<tbody id="v-tbody"></tbody></table>' +
+
+    '<div class="sec">Distribution</div>' +
+    '<div id="v-bars"></div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODE SWITCHING
+   ═══════════════════════════════════════════════════════════════ */
+function switchMode(mode) {
+  if (mode === currentMode) return;
+  if (visualizerSource) { visualizerSource.close(); visualizerSource = null; }
+  isThinking = false;
+  currentMode = mode;
+  analysisOverlay = [];
+  if (mode === 'play') { initBoard(); newGame(); return; }
+  syncTabs(); updateUI();
+}
+
+function syncTabs() {
+  document.querySelectorAll('.mtab').forEach(function(b) { b.classList.remove('on'); });
+  var t = document.getElementById('t-' + currentMode);
+  if (t) t.classList.add('on');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UI UPDATE
+   ═══════════════════════════════════════════════════════════════ */
+function updateUI() {
+  renderGoban(); renderPanel(); syncTabs();
+  if (!isThinking && !gameOver)
+    setStatus('move ' + moveCount + ' · ' + playerName(currentPlayer).toLowerCase() + ' to play · ' + BOARD_SIZE + '×' + BOARD_SIZE + ' · ' + simulations + ' sims');
+}
+
+function setStatus(s) { document.getElementById('status').innerHTML = s; }
+function setSimulations(n) { simulations = n; renderPanel(); }
+function setBoardSize(n) { if (n !== BOARD_SIZE) { BOARD_SIZE = n; newGame(); } }
+
+/* ═══════════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════════ */
+window.addEventListener('resize', function() { renderGoban(); });
+initBoard(); renderGoban(); renderPanel(); newGame();
 </script>
+
 </body>
 </html>

@@ -19,9 +19,9 @@ import random
 from typing import Optional
 
 
-# ---------------------------------------------------------------------------
+
 # GoBoard  (mirrors game_info_t + board logic from GoBoard.hpp / Color.hpp)
-# ---------------------------------------------------------------------------
+
 
 class GoBoard:
     """
@@ -37,9 +37,9 @@ class GoBoard:
     BOARD_SIZE = 9
     KOMI = 6.5  # From Constant.hpp
 
-    # ------------------------------------------------------------------
+
     # Construction / copy
-    # ------------------------------------------------------------------
+
 
     def __init__(self, size: int = 9):
         self.size = size
@@ -67,9 +67,9 @@ class GoBoard:
         b._all_positions = self._all_positions  # shared, immutable
         return b
 
-    # ------------------------------------------------------------------
+
     # Basic accessors
-    # ------------------------------------------------------------------
+
 
     @staticmethod
     def opposite_color(color: int) -> int:
@@ -84,9 +84,9 @@ class GoBoard:
         """2D list for JSON serialization."""
         return [row[:] for row in self.grid]
 
-    # ------------------------------------------------------------------
+
     # Group / liberty helpers  (mirrors string handling in GoBoard.hpp)
-    # ------------------------------------------------------------------
+
 
     def _has_liberty(self, row: int, col: int) -> bool:
         """
@@ -160,9 +160,9 @@ class GoBoard:
             grid[r][c] = GoBoard.EMPTY
         return len(group)
 
-    # ------------------------------------------------------------------
+
     # Legality checks  (mirrors IsLegal / IsSuicide / IsLegalNotEye)
-    # ------------------------------------------------------------------
+
 
     def is_suicide(self, row: int, col: int, color: int) -> bool:
         """
@@ -240,9 +240,9 @@ class GoBoard:
             return False
         return True
 
-    # ------------------------------------------------------------------
+
     # Move generation
-    # ------------------------------------------------------------------
+
 
     def get_legal_moves(self, color: int) -> list:
         """Return list of legal (row, col) for *color*."""
@@ -266,9 +266,9 @@ class GoBoard:
                     moves.append((r, c))
         return moves
 
-    # ------------------------------------------------------------------
+
     # Place stone / pass  (mirrors PutStone from GoBoard.hpp)
-    # ------------------------------------------------------------------
+
 
     def place_stone(self, row: int, col: int, color: int) -> bool:
         """
@@ -396,9 +396,9 @@ class GoBoard:
         self.current_player = color ^ 0x3
         self.ko_point = None
 
-    # ------------------------------------------------------------------
+
     # Game-over / scoring  (mirrors CalculateScore from GoBoard.hpp)
-    # ------------------------------------------------------------------
+
 
     def is_game_over(self) -> bool:
         return self.consecutive_passes >= 2
@@ -460,9 +460,9 @@ class GoBoard:
         }
 
 
-# ---------------------------------------------------------------------------
+
 # MCTSNode  (mirrors uct_node_t / child_node_t from MCTSNode.hpp)
-# ---------------------------------------------------------------------------
+
 
 class MCTSNode:
     """
@@ -491,9 +491,9 @@ class MCTSNode:
         self.untried_moves = board.get_legal_non_eye_moves(color)
         random.shuffle(self.untried_moves)
 
-    # ------------------------------------------------------------------
+
     # UCB1-Tuned  (from UCBEvaluation.cpp)
-    # ------------------------------------------------------------------
+
 
     def ucb1(self, exploration_weight: float = 1.414) -> float:
         """
@@ -511,16 +511,16 @@ class MCTSNode:
         v = p - p * p + math.sqrt(2.0 * div)
         return p + exploration_weight * math.sqrt(div * min(0.25, v))
 
-    # ------------------------------------------------------------------
+
     # Selection  (pick child with highest UCB)
-    # ------------------------------------------------------------------
+
 
     def select_child(self) -> "MCTSNode":
         return max(self.children, key=lambda c: c.ucb1())
 
-    # ------------------------------------------------------------------
+
     # Expansion  (InitializeCandidate + add child)
-    # ------------------------------------------------------------------
+
 
     def expand(self) -> "MCTSNode":
         """Expand one untried move and return the new child node."""
@@ -532,9 +532,9 @@ class MCTSNode:
         self.children.append(child)
         return child
 
-    # ------------------------------------------------------------------
+
     # Simulation  (fast random playout)
-    # ------------------------------------------------------------------
+
 
     def simulate(self) -> int:
         """
@@ -581,9 +581,9 @@ class MCTSNode:
         score = sim_board.calculate_score()
         return GoBoard.BLACK if score["winner"] == "B" else GoBoard.WHITE
 
-    # ------------------------------------------------------------------
+
     # Back-propagation  (UpdateResult from MCTSNode.hpp)
-    # ------------------------------------------------------------------
+
 
     def backpropagate(self, winner: int):
         """Walk up the tree, updating visits and wins."""
@@ -596,18 +596,18 @@ class MCTSNode:
                     node.wins += 1.0
             node = node.parent
 
-    # ------------------------------------------------------------------
+
     # Best child (most visited, robust child selection)
-    # ------------------------------------------------------------------
+
 
     def best_child(self) -> "MCTSNode":
         """Return child with the most visits (robust selection)."""
         return max(self.children, key=lambda c: c.visits)
 
 
-# ---------------------------------------------------------------------------
+
 # MCTSEngine  (orchestrates the MCTS loop)
-# ---------------------------------------------------------------------------
+
 
 class MCTSEngine:
     """
@@ -624,9 +624,9 @@ class MCTSEngine:
     def __init__(self, simulations: int = 1000):
         self.simulations = simulations
 
-    # ------------------------------------------------------------------
+
     # Core search
-    # ------------------------------------------------------------------
+
 
     def _run_mcts(self, board: GoBoard, color: int,
                   simulations: int, callback=None) -> MCTSNode:
@@ -661,9 +661,9 @@ class MCTSEngine:
 
         return root
 
-    # ------------------------------------------------------------------
+
     # Stats helpers
-    # ------------------------------------------------------------------
+
 
     @staticmethod
     def _child_win_rate(child: MCTSNode) -> float:
@@ -690,9 +690,9 @@ class MCTSEngine:
             ],
         }
 
-    # ------------------------------------------------------------------
+
     # Public API
-    # ------------------------------------------------------------------
+
 
     def get_best_move(self, board: GoBoard, color: int,
                       callback=None) -> tuple:

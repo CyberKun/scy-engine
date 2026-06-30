@@ -10,30 +10,31 @@ Endpoints:
     GET  /api/visualize   -> SSE stream of live MCTS stats
 """
 
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
 from go_engine import GoBoard, MCTSEngine
 import json
 import threading
 import time
 import queue
+import os
 
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__)
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 CORS(app)
 
+# Resolve the WGo.js assets directory (served as /wgo/...)
+WGO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wgo.js-master', 'wgo')
+
 # Global game state
-game_board = GoBoard()
-mcts_engine = MCTSEngine(simulations=1000)
+game_board = GoBoard(size=19)
+mcts_engine = MCTSEngine(simulations=100)
 board_lock = threading.Lock()
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def board_response(extra: dict = None) -> dict:
     """Standard JSON payload describing the current board state."""
@@ -57,10 +58,6 @@ def board_response(extra: dict = None) -> dict:
 
 
 def ai_respond(simulations: int) -> dict:
-    """
-    Let the AI (MCTS engine) pick a move and apply it to the global board.
-    Returns a dict with the engine's move info.
-    """
     color = game_board.current_player
 
     if game_board.is_game_over():
@@ -86,36 +83,28 @@ def ai_respond(simulations: int) -> dict:
         return {"engine_move": list(move)}
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
-
 @app.route("/")
 def index():
-    """Serve the frontend."""
     return render_template("index.html")
 
+@app.route("/wgo/<path:filename>")
+def serve_wgo(filename):
+    """Serve WGo.js library assets (JS, CSS, images, textures)."""
+    return send_from_directory(WGO_DIR, filename)
 
 @app.route("/api/new_game", methods=["POST"])
 def new_game():
-    """Reset the board and start a fresh game."""
     global game_board
     with board_lock:
         data = request.get_json(silent=True) or {}
-        size = data.get("size", 9)
+        size = data.get("size", 19)
         if size not in (9, 13, 19):
-            size = 9
+            size = 19
         game_board = GoBoard(size=size)
     return jsonify(board_response())
 
-
 @app.route("/api/move", methods=["POST"])
 def make_move():
-    """
-    Accept a player move, validate it, apply it, then run the AI.
-
-    Request JSON: {row: int, col: int, simulations: int (optional)}
-    """
     data = request.get_json(silent=True)
     if data is None:
         return jsonify({"error": "Invalid JSON body"}), 400
@@ -157,7 +146,6 @@ def make_move():
 
 @app.route("/api/pass", methods=["POST"])
 def pass_move():
-    """Register a player pass, then let the AI respond."""
     data = request.get_json(silent=True) or {}
     simulations = int(data.get("simulations", mcts_engine.simulations))
 
@@ -179,13 +167,6 @@ def pass_move():
 
 @app.route("/api/analyse", methods=["POST"])
 def analyse():
-    """
-    Run MCTS analysis on the current (or a provided) board state.
-
-    Request JSON:
-        board_state: optional 2D list to analyse instead of the live game
-        simulations: optional int (default 1000)
-    """
     data = request.get_json(silent=True) or {}
     simulations = int(data.get("simulations", mcts_engine.simulations))
     top_n = int(data.get("top_n", 5))
@@ -221,14 +202,6 @@ def analyse():
 
 @app.route("/api/visualize")
 def visualize():
-    """
-    Server-Sent Events endpoint.
-
-    Runs MCTS on the current position and streams stats every ~50 iterations.
-
-    Query params:
-        simulations: int (default 1000)
-    """
     simulations = int(request.args.get("simulations", 1000))
 
     def generate():
@@ -266,23 +239,13 @@ def visualize():
                     })
 
 
-# ---------------------------------------------------------------------------
-# Error handlers
-# ---------------------------------------------------------------------------
-
 @app.errorhandler(404)
 def not_found(_e):
     return jsonify({"error": "Not found"}), 404
 
-
 @app.errorhandler(500)
 def server_error(_e):
     return jsonify({"error": "Internal server error"}), 500
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=5000, threaded=True)
